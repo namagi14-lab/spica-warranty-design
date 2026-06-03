@@ -1,0 +1,57 @@
+[
+  {
+    "Step_key": 1,
+    "Command_Control": {
+      "Com_type": "Get_ProgramVer",
+      "Comment": "GetProgramVer",
+      "Timeout": 3000,
+      "Retry": 1
+    }
+  },
+  {
+    "Step_key": 2,
+    "Command_Control": {
+      "Com_type": "GetDateTime",
+      "Comment": "GetDateTime",
+      "Timeout": 3000,
+      "Retry": 3
+    }
+  },
+  {
+    "Step_key": 3,
+    "Command_Body": {
+      "Prefix": "",
+      "Body": "",
+      "Suffix": ""
+    },
+    "Command_Control": {
+      "Com_type": "PostCsvfile_ST",
+      "Comment": "CreateCsvFileST",
+      "Verify_1": "Y302V9000102",
+      "Verify_2": "002",
+      "Io_type": "READ",
+      "Timeout": 3000,
+      "Retry": 3
+    }
+  },
+  {
+    "Step_key": 4,
+    "Command_Body": {
+      "Prefix": "",
+      "Body": "",
+      "Suffix": ""
+    },
+    "Command_Control": {
+      "Com_type": "Upload_Jigdata_forPLC",
+      "Comment": "UploadJigdataForPLC",
+      "Verify_1": "",
+      "Verify_2": "",
+      "Io_type": "READ",
+      "Timeout": 3000,
+      "Retry": 20,
+      "RetryTimer": 10000,
+      "RaspiPath": "C:\\factory\\Program\\C0L\\C0L_0161\\Program\\config\\",
+      "Filename": "FTPconfig_VN.json"
+    }
+  }
+]
