@@ -150,3 +150,44 @@ CREATE TABLE IF NOT EXISTS ip_numbering (
   UNIQUE KEY uq_ip_address (IpAddress),
   KEY idx_machine_serial (MachineSerial)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================================================
+-- 工程Jsonファイル管理
+-- ============================================================
+
+-- 工程Jsonファイルシーケンス管理（バージョン含む）
+-- 同一 (ProcessId, FileName) に対して複数バージョンを持つ。
+-- IsActive=1 が「現在使用中」。更新時は旧を IsActive=0 にして新規 INSERT する。
+CREATE TABLE IF NOT EXISTS process_file_sequence (
+  SeqId       INT          NOT NULL AUTO_INCREMENT,
+  ProcessId   INT          NOT NULL COMMENT 'FK: process_master',
+  StepOrder   INT          NOT NULL COMMENT '実行順序（1始まり）',
+  FileName    VARCHAR(200) NOT NULL COMMENT '工程JSONファイル名（例: Y_jsonStr_RegistrationSTA1_raspi.json）',
+  FileVersion INT          NOT NULL DEFAULT 1 COMMENT 'ファイルバージョン（更新ごとにインクリメント）',
+  FileHash    CHAR(64)     NOT NULL COMMENT 'SHA-256ハッシュ（整合確認・重複登録防止）',
+  FileContent JSON         NOT NULL COMMENT 'JSONファイル内容',
+  IsActive    TINYINT(1)   NOT NULL DEFAULT 1 COMMENT '1=このバージョンを使用中',
+  CreatedAt   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (SeqId),
+  UNIQUE KEY uq_file_hash (FileHash),
+  KEY idx_process_active (ProcessId, IsActive, StepOrder),
+  CONSTRAINT fk_pfs_process FOREIGN KEY (ProcessId) REFERENCES process_master (ProcessId)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='工程Jsonファイルシーケンス管理（バージョン含む）';
+
+-- MiniPC 工程ファイル実行進捗
+-- process_execution 開始時に IsActive=1 の全ファイルを PENDING で一括生成。
+-- GET /ProcessFileApi/Next 呼び出しごとに:
+--   前の RUNNING を OK に更新 → 次の PENDING を RUNNING に更新して返す。
+CREATE TABLE IF NOT EXISTS process_file_execution (
+  FileExecId  BIGINT     NOT NULL AUTO_INCREMENT,
+  ExecutionId BIGINT     NOT NULL COMMENT 'FK: process_execution',
+  SeqId       INT        NOT NULL COMMENT 'FK: process_file_sequence（実行時バージョンを特定）',
+  Status      ENUM('PENDING','RUNNING','OK','NG') NOT NULL DEFAULT 'PENDING',
+  StartedAt   DATETIME            COMMENT '実行開始日時',
+  CompletedAt DATETIME            COMMENT '完了日時',
+  PRIMARY KEY (FileExecId),
+  UNIQUE KEY uq_exec_seq (ExecutionId, SeqId),
+  KEY idx_exec_status (ExecutionId, Status),
+  CONSTRAINT fk_pfe_execution FOREIGN KEY (ExecutionId) REFERENCES process_execution (ExecutionId),
+  CONSTRAINT fk_pfe_seq       FOREIGN KEY (SeqId)       REFERENCES process_file_sequence (SeqId)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='MiniPC工程ファイル実行進捗';
