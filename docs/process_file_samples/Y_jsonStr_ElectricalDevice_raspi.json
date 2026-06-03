@@ -1,0 +1,589 @@
+[
+  {
+    "Step_key": 1,
+    "Command_Control": {
+      "Com_type": "Get_ProgramVer",
+      "Comment": "GetProgramVer",
+      "Timeout": 3000,
+      "Retry": 1
+    }
+  },
+  {
+    "Step_key": 2,
+    "Command_Control": {
+      "Com_type": "Ping",
+      "Comment": "Ping",
+      "Timeout": 3000,
+      "Retry": 20
+    }
+  },
+  {
+    "Step_key": 3,
+    "Command_Control": {
+      "Com_type": "TCPOpen",
+      "Comment": "Connect",
+      "Timeout": 3000,
+      "Retry": 3
+    }
+  },
+  {
+    "Step_key": 4,
+    "Command_Body": {
+      "Prefix": "!R!",
+      "Body": "KCFG'DINQ',1297;",
+      "Suffix": "EXIT,e;"
+    },
+    "Command_Control": {
+      "Com_type": "Get_Serial",
+      "Comment": "CheckMachineSerialNo3degits",
+      "Verify_1": "DINQ 1297;",
+      "Verify_2": "",
+      "Io_type": "READ",
+      "Timeout": 3000,
+      "Retry": 3
+    }
+  },
+  {
+    "Step_key": 5,
+    "Command_Body": {
+      "Prefix": "!R!",
+      "Body": "KCFG'DINQ',1297;",
+      "Suffix": "EXIT,e;"
+    },
+    "Command_Control": {
+      "Com_type": "SendReceiveJudge",
+      "Comment": "CheckMachineSerialNo3degits",
+      "Verify_1": "DINQ 1297;",
+      "Verify_2": "{{MACHINE_SERIAL_VERIFY}}",
+      "Io_type": "READ",
+      "Timeout": 3000,
+      "Retry": 3,
+      "Offset": 0,
+      "Length": 3
+    }
+  },
+  {
+    "Step_key": 6,
+    "Command_Body": {
+      "Prefix": "!R!",
+      "Body": "KCFG'DINQ',2250;",
+      "Suffix": "EXIT,e;"
+    },
+    "Command_Control": {
+      "Com_type": "SendReceiveJudge",
+      "Comment": "CheckEngineReadyStatus",
+      "Verify_1": "DINQ 2250;",
+      "Verify_2": "6",
+      "Io_type": "READ",
+      "Timeout": 3000,
+      "Retry": 60,
+      "RetryTimer": 3000
+    }
+  },
+  {
+    "Step_key": 7,
+    "Command_Control": {
+      "Com_type": "TCPClose",
+      "Comment": "DisConnect",
+      "Timeout": 3000,
+      "Retry": 3
+    }
+  },
+  {
+    "Step_key": 8,
+    "Command_Body": {
+      "Prefix": "",
+      "Body": "Starting the fan check. Continue?(y+Enter or N+Enter)",
+      "Suffix": ""
+    },
+    "Command_Control": {
+      "Com_type": "Display",
+      "Comment": "SetAllFANDrive",
+      "Verify_1": "",
+      "Verify_2": "",
+      "Io_type": "WRITE",
+      "Timeout": 3000,
+      "Retry": 3
+    }
+  },
+  {
+    "Step_key": 9,
+    "Command_Control": {
+      "Com_type": "TCPOpen",
+      "Comment": "Connect",
+      "Timeout": 3000,
+      "Retry": 3
+    }
+  },
+  {
+    "Step_key": 10,
+    "Command_Body": {
+      "Prefix": "!R!",
+      "Body": "KCFG'EESS',2,55,0,'0100';",
+      "Suffix": "EXIT,e;"
+    },
+    "Command_Control": {
+      "Com_type": "Send",
+      "Comment": "SetAllFANDrive",
+      "Verify_1": "",
+      "Verify_2": "",
+      "Io_type": "WRITE",
+      "Timeout": 3000,
+      "Retry": 3
+    }
+  },
+  {
+    "Step_key": 11,
+    "Command_Control": {
+      "Com_type": "Wait_msec",
+      "Comment": "Wait10000msec",
+      "Timeout": 10000,
+      "Retry": 1
+    }
+  },
+  {
+    "Step_key": 12,
+    "Command_Body": {
+      "Prefix": "!R!",
+      "Body": "KCFG'EESS',2,55,0,'0000';",
+      "Suffix": "EXIT,e;"
+    },
+    "Command_Control": {
+      "Com_type": "Send",
+      "Comment": "SetAllFANStop",
+      "Verify_1": "",
+      "Verify_2": "",
+      "Io_type": "WRITE",
+      "Timeout": 3000,
+      "Retry": 3
+    }
+  },
+  {
+    "Step_key": 13,
+    "Command_Control": {
+      "Com_type": "TCPClose",
+      "Comment": "DisConnect",
+      "Timeout": 3000,
+      "Retry": 3
+    }
+  },
+  {
+    "Step_key": 14,
+    "Command_Body": {
+      "Prefix": "",
+      "Body": "Was the check OK?(y+Enter or N+Enter)",
+      "Suffix": ""
+    },
+    "Command_Control": {
+      "Com_type": "Display",
+      "Comment": "SetAllFANDrive",
+      "Verify_1": "",
+      "Verify_2": "",
+      "Io_type": "WRITE",
+      "Timeout": 3000,
+      "Retry": 3
+    }
+  },
+  {
+    "Step_key": 15,
+    "Command_Control": {
+      "Com_type": "TCPOpen",
+      "Comment": "Connect",
+      "Timeout": 3000,
+      "Retry": 3
+    }
+  },
+  {
+    "Step_key": 16,
+    "Command_Body": {
+      "Prefix": "!R!",
+      "Body": "KCFG'DINQ',2273;",
+      "Suffix": "EXIT,e;"
+    },
+    "Command_Control": {
+      "Com_type": "SendReceiveJudge",
+      "Comment": "CheckTablePaperExistence",
+      "Verify_1": "DINQ 2273;",
+      "Verify_2": "{{DP_PAPER_SIZE_VERIFY}}",
+      "Io_type": "READ",
+      "Timeout": 3000,
+      "Retry": 3,
+      "ListNo": 1
+    }
+  },
+  {
+    "Step_key": 17,
+    "Command_Body": {
+      "Prefix": "\u001B%-12345X",
+      "Body": "@PJL KGETOBJ OBJ=\"#1.3.6.1.2.1.43.6.1.1.3\"",
+      "Suffix": "\u001B%-12345X"
+    },
+    "Command_Control": {
+      "Com_type": "SendReceiveNonJudge",
+      "Comment": "CheckRearCoverOpenSW",
+      "Verify_1": "@PJL KGETOBJ OBJ=\"#1.3.6.1.2.1.43.6.1.1.3\"",
+      "Verify_2": "VALUE=3",
+      "Io_type": "READ",
+      "Timeout": 3000,
+      "Retry": 3,
+      "ListNo": 3
+    }
+  },
+  {
+    "Step_key": 18,
+    "Command_Body": {
+      "Prefix": "!R!",
+      "Body": "KCFG'DINQ',1139;",
+      "Suffix": "EXIT,e;"
+    },
+    "Command_Control": {
+      "Com_type": "SendReceiveNonJudge",
+      "Comment": "CheckWiFiMacAddress",
+      "Verify_1": "DINQ 1139;",
+      "Verify_2": "",
+      "Io_type": "READ",
+      "Timeout": 3000,
+      "Retry": 3,
+      "Offset": 0,
+      "Length": 9
+    }
+  },
+  {
+    "Step_key": 19,
+    "Command_Body": {
+      "Prefix": "!R!",
+      "Body": "KCFG'DINQ',0328;",
+      "Suffix": "EXIT,e;"
+    },
+    "Command_Control": {
+      "Com_type": "SendReceiveJudge",
+      "Comment": "CheckWiFiSetting",
+      "Verify_1": "DINQ 0328;",
+      "Verify_2": "{{WIFI_BOARD_VERIFY}}",
+      "Io_type": "READ",
+      "Timeout": 3000,
+      "Retry": 3
+    }
+  },
+  {
+    "Step_key": 20,
+    "Command_Body": {
+      "Prefix": "!R!",
+      "Body": "KCFG'EESS',2,49,0,'01';",
+      "Suffix": "EXIT,e;"
+    },
+    "Command_Control": {
+      "Com_type": "Send",
+      "Comment": "LoopSWCommandOn",
+      "Verify_1": "",
+      "Verify_2": "",
+      "Io_type": "WRITE",
+      "Timeout": 3000,
+      "Retry": 3
+    }
+  },
+  {
+    "Step_key": 21,
+    "Command_Control": {
+      "Com_type": "TCPClose",
+      "Comment": "DisConnect",
+      "Timeout": 3000,
+      "Retry": 3
+    }
+  },
+  {
+    "Step_key": 22,
+    "Command_Body": {
+      "Prefix": "",
+      "Body": "The next step is to inspect the Raer cover. Please proceed when you are ready. Open and close the Rear cover repeatedly.(y+Enter or N+Enter)",
+      "Suffix": ""
+    },
+    "Command_Control": {
+      "Com_type": "Display",
+      "Comment": "OpenRearCover",
+      "Verify_1": "",
+      "Verify_2": "",
+      "Io_type": "WRITE",
+      "Timeout": 3000,
+      "Retry": 3
+    }
+  },
+  {
+    "Step_key": 23,
+    "Command_Control": {
+      "Com_type": "TCPOpen",
+      "Comment": "Connect",
+      "Timeout": 3000,
+      "Retry": 3
+    }
+  },
+  {
+    "Step_key": 24,
+    "Command_Body": {
+      "Prefix": "!R!",
+      "Body": "KCFG'EESS',1,49,1,'00';",
+      "Suffix": "EXIT,e;"
+    },
+    "Command_Control": {
+      "Com_type": "SendReceiveJudge",
+      "Comment": "CheckLoopSW",
+      "Verify_1": "EESS 1, 0049, 0001;",
+      "Verify_2": "04",
+      "Io_type": "READ",
+      "Timeout": 3000,
+      "Retry": 30,
+      "Offset": 4,
+      "Length": 2
+    }
+  },
+  {
+    "Step_key": 25,
+    "Command_Body": {
+      "Prefix": "!R!",
+      "Body": "KCFG'EESS',2,49,0,'00';",
+      "Suffix": "EXIT,e;"
+    },
+    "Command_Control": {
+      "Com_type": "Send",
+      "Comment": "LoopSWCommandOff",
+      "Verify_1": "",
+      "Verify_2": "",
+      "Io_type": "WRITE",
+      "Timeout": 3000,
+      "Retry": 3
+    }
+  },
+  {
+    "Step_key": 26,
+    "Command_Control": {
+      "Com_type": "TCPClose",
+      "Comment": "DisConnect",
+      "Timeout": 3000,
+      "Retry": 3
+    }
+  },
+  {
+    "Step_key": 27,
+    "Command_Body": {
+      "Prefix": "",
+      "Body": "The next step is to inspect the toner container. Please proceed when you are ready. (y+Enter or N+Enter)",
+      "Suffix": ""
+    },
+    "Command_Control": {
+      "Com_type": "Display",
+      "Comment": "Open the the Cover Front Upper",
+      "Verify_1": "",
+      "Verify_2": "",
+      "Io_type": "READ",
+      "Timeout": 3000,
+      "Retry": 1
+    }
+  },
+  {
+    "Step_key": 28,
+    "Command_Control": {
+      "Com_type": "TCPOpen",
+      "Comment": "Connect",
+      "Timeout": 3000,
+      "Retry": 3
+    }
+  },
+  {
+    "Step_key": 29,
+    "Command_Body": {
+      "Prefix": "!R!",
+      "Body": "KCFG'EESS',2,309,0000,'010001';",
+      "Suffix": "EXIT,e;"
+    },
+    "Command_Control": {
+      "Com_type": "Send",
+      "Comment": "DriveTonerContainerBK",
+      "Verify_1": "",
+      "Verify_2": "",
+      "Io_type": "WRITE",
+      "Timeout": 3000,
+      "Retry": 3
+    }
+  },
+  {
+    "Step_key": 30,
+    "Command_Control": {
+      "Com_type": "Wait_msec",
+      "Comment": "Wait1000msec",
+      "Timeout": 1000,
+      "Retry": 1
+    }
+  },
+  {
+    "Step_key": 31,
+    "Command_Body": {
+      "Prefix": "!R!",
+      "Body": "KCFG'EESS',2,309,0000,'000001';",
+      "Suffix": "EXIT,e;"
+    },
+    "Command_Control": {
+      "Com_type": "Send",
+      "Comment": "StopTonerContainerBK",
+      "Verify_1": "",
+      "Verify_2": "",
+      "Io_type": "WRITE",
+      "Timeout": 3000,
+      "Retry": 3
+    }
+  },
+  {
+    "Step_key": 32,
+    "Command_Body": {
+      "Prefix": "!R!",
+      "Body": "KCFG'EESS',2,309,0000,'010002';",
+      "Suffix": "EXIT,e;"
+    },
+    "Command_Control": {
+      "Com_type": "Send",
+      "Comment": "DriveTonerContainerCyan",
+      "Verify_1": "",
+      "Verify_2": "",
+      "Io_type": "WRITE",
+      "Timeout": 3000,
+      "Retry": 3
+    }
+  },
+  {
+    "Step_key": 33,
+    "Command_Control": {
+      "Com_type": "Wait_msec",
+      "Comment": "Wait1000msec",
+      "Timeout": 1000,
+      "Retry": 1
+    }
+  },
+  {
+    "Step_key": 34,
+    "Command_Body": {
+      "Prefix": "!R!",
+      "Body": "KCFG'EESS',2,309,0000,'000002';",
+      "Suffix": "EXIT,e;"
+    },
+    "Command_Control": {
+      "Com_type": "Send",
+      "Comment": "StopTonerContainerCyan",
+      "Verify_1": "",
+      "Verify_2": "",
+      "Io_type": "WRITE",
+      "Timeout": 3000,
+      "Retry": 3
+    }
+  },
+  {
+    "Step_key": 35,
+    "Command_Body": {
+      "Prefix": "!R!",
+      "Body": "KCFG'EESS',2,309,0000,'010004';",
+      "Suffix": "EXIT,e;"
+    },
+    "Command_Control": {
+      "Com_type": "Send",
+      "Comment": "DriveTonerContainerMagenta",
+      "Verify_1": "",
+      "Verify_2": "",
+      "Io_type": "WRITE",
+      "Timeout": 3000,
+      "Retry": 3
+    }
+  },
+  {
+    "Step_key": 36,
+    "Command_Control": {
+      "Com_type": "Wait_msec",
+      "Comment": "Wait1000msec",
+      "Timeout": 1000,
+      "Retry": 1
+    }
+  },
+  {
+    "Step_key": 37,
+    "Command_Body": {
+      "Prefix": "!R!",
+      "Body": "KCFG'EESS',2,309,0000,'000004';",
+      "Suffix": "EXIT,e;"
+    },
+    "Command_Control": {
+      "Com_type": "Send",
+      "Comment": "StopTonerContainerMagenta",
+      "Verify_1": "",
+      "Verify_2": "",
+      "Io_type": "WRITE",
+      "Timeout": 3000,
+      "Retry": 3
+    }
+  },
+  {
+    "Step_key": 38,
+    "Command_Body": {
+      "Prefix": "!R!",
+      "Body": "KCFG'EESS',2,309,0000,'010008';",
+      "Suffix": "EXIT,e;"
+    },
+    "Command_Control": {
+      "Com_type": "Send",
+      "Comment": "DriveTonerContainerYellow",
+      "Verify_1": "",
+      "Verify_2": "",
+      "Io_type": "WRITE",
+      "Timeout": 3000,
+      "Retry": 3
+    }
+  },
+  {
+    "Step_key": 39,
+    "Command_Control": {
+      "Com_type": "Wait_msec",
+      "Comment": "Wait1000msec",
+      "Timeout": 1000,
+      "Retry": 1
+    }
+  },
+  {
+    "Step_key": 40,
+    "Command_Body": {
+      "Prefix": "!R!",
+      "Body": "KCFG'EESS',2,309,0000,'000008';",
+      "Suffix": "EXIT,e;"
+    },
+    "Command_Control": {
+      "Com_type": "Send",
+      "Comment": "StopTonerContainerYellow",
+      "Verify_1": "",
+      "Verify_2": "",
+      "Io_type": "WRITE",
+      "Timeout": 3000,
+      "Retry": 3
+    }
+  },
+  {
+    "Step_key": 41,
+    "Command_Control": {
+      "Com_type": "TCPClose",
+      "Comment": "DisConnect",
+      "Timeout": 3000,
+      "Retry": 3
+    }
+  },
+  {
+    "Step_key": 42,
+    "Command_Body": {
+      "Prefix": "",
+      "Body": "Is the toner container operating correctly? (y+Enter or N+Enter)",
+      "Suffix": ""
+    },
+    "Command_Control": {
+      "Com_type": "Display",
+      "Comment": "CheckTonerDrive",
+      "Verify_1": "",
+      "Verify_2": "",
+      "Io_type": "READ",
+      "Timeout": 3000,
+      "Retry": 1
+    }
+  }
+]
