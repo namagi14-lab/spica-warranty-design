@@ -11,30 +11,34 @@
 graph TB
     subgraph 製造ライン
         P["🖨️ 製品マシン（Spica）"]
-        M["💻 MiniPC（治具）\nC0L-0161"]
+        M["💻 MiniPC（治具）\nHTTPクライアント + HTTPサーバー"]
+        P <-->|KCFGコマンド LAN| M
     end
 
-    subgraph サーバー
-        H["🖥️ WorkInstructionApp\nHostPC C0L-0160/0163\nASP.NET MVC 5"]
+    subgraph HostPC
+        H["🖥️ WorkInstructionApp\nASP.NET MVC 5"]
         DB[("🗄️ MySQL\nprod_process_execution_db")]
         H <-->|SQL| DB
     end
 
-    subgraph オペレーター
-        T["📱 タブレット\n作業指示 表示/確認"]
-        DashPC["🖥️ ダッシュボード\nC0L-0164"]
+    subgraph オペレーター側
+        T["📱 タブレット\n作業指示専用"]
+        Dash["🖥️ ダッシュボード PC\n別プログラム（ProcessDashboard）"]
     end
 
-    subgraph 外部システム
+    subgraph 外部
         DBE["DBEntryApp\n工程マスタ管理"]
     end
 
-    P <-->|"KCFGコマンド (LAN)"| M
-    M <-->|"WebAPI (HTTP)"| H
-    H -->|"SignalR"| DashPC
-    DashPC --> T
-    DBE -->|"工程定義同期"| H
+    M -->|WebAPI HTTP| H
+    H -->|コールバック HTTP| M
+    T -->|HTTP| H
+    H -->|SignalR| T
+    H -->|SignalR| Dash
+    DBE -->|工程定義同期| H
 ```
+
+> **マシン特定の原則**: すべての処理でマシンを特定するキーは**シリアル番号**を使用する。
 
 ---
 
@@ -42,29 +46,34 @@ graph TB
 
 ```
 ① IP採番（初工程のみ）
-   オペレーターがシリアルをスキャン → サーバーがIPを採番 → MiniPCが製品にIP付与
+   MiniPC がサーバーに「SN123 の IP をください」と問い合わせ
+   → サーバーが ip_numbering プールから空き IP を割り当て
+   → MiniPC が製品マシンに IP を付与
 
-② 入室
-   MiniPC が /MachineApi/Enter を呼ぶ
-   → process_execution（工程実行）を開始
+② 入室（オペレーターがタブレットから）
+   オペレーターがタブレットでシリアル番号を入力・入室操作
+   → WorkInstructionApp が process_execution（工程実行）を開始
    → 作業指示・ファイル実行レコードを PENDING で一括生成
    → ダッシュボードにリアルタイム反映（SignalR）
 
-③ 工程Jsonファイル実行（StepOrder 順）
+③ 工程 Jsonファイル実行（MiniPC が主導）
    MiniPC が /ProcessFileApi/Next を呼ぶ
    → ハッシュ確認（不一致なら /FileContent でダウンロード）
-   → JSONファイルを製品マシンに実行
+   → JSON ファイルを製品マシンに実行
 
-④ MANUAL Step でのオペレーター確認
-   MiniPC が /StepApi/UpdateStep → hasInstruction=true の場合
-   → オペレーターがタブレットで OK/NG を入力するまでポーリング待機
+④ MANUAL Step でのオペレーター確認（プッシュ型）
+   MiniPC が /StepApi/UpdateStep → WorkInstructionApp が判断
+   → タブレットに作業指示を表示（SignalR）
+   → オペレーターが OK/NG を入力
+   → WorkInstructionApp が MiniPC のエンドポイントへコールバック
+   ※ MiniPC によるポーリングは不要
 
 ⑤ 工程完了
-   全Stepが完了 → /MachineApi/Complete (OK/NG)
+   MiniPC が /MachineApi/Complete → OK / NG / ABORT
    → NG の場合はラインアウト → 修正後に再投入
 ```
 
-各フローの詳細は **[07_system_design.md](docs/07_system_design.md)** の Mermaid シーケンス図を参照。
+各フローの詳細は **[07_system_design.md](docs/07_system_design.md)** を参照。
 
 ---
 
@@ -78,9 +87,38 @@ graph TB
 | 04 | [api_spec.md](docs/04_api_spec.md) | MachineApi / StepApi / InstructionApi 仕様 |
 | 05 | [sequence.md](docs/05_sequence.md) | 基本シーケンス図 |
 | 06 | [process_file_api.md](docs/06_process_file_api.md) | 工程 Jsonファイル API 仕様（/ProcessFileApi） |
-| 07 | [system_design.md](docs/07_system_design.md) | **システム設計書（Mermaid シーケンス 8本 + ER図）** |
+| **07** | **[system_design.md](docs/07_system_design.md)** | **システム設計書（Mermaid シーケンス 8本）← メイン** |
 | — | [SQL/schema.sql](SQL/schema.sql) | 完全 DDL（CREATE TABLE） |
 | — | [docs/process_file_samples/](docs/process_file_samples/) | 工程 JSON サンプルファイル |
+
+---
+
+## API 早見表
+
+### タブレット → WorkInstructionApp（オペレーター操作）
+
+| エンドポイント | 用途 |
+|--------------|------|
+| `POST /MachineApi/Enter` | **入室**（オペレーターがシリアル番号を入力） |
+| `POST /InstructionApi/Complete` | 作業指示を OK/NG で完了 |
+
+### MiniPC → WorkInstructionApp
+
+| エンドポイント | 用途 |
+|--------------|------|
+| `GET /IpApi/Assign?serialNo=` | **IP 採番**（空き IP をサーバーから取得） |
+| `GET /ProcessFileApi/Next?serialNo=` | 次の JSON ファイルを問い合わせ |
+| `GET /ProcessFileApi/FileContent/{seqId}` | ファイル内容を取得（ハッシュ不一致時） |
+| `POST /StepApi/UpdateStep` | Step 開始通知（MANUAL Step の確認トリガー） |
+| `POST /StepApi/RecordStep` | Step 完了を記録 |
+| `POST /MachineApi/Complete` | 工程完了（OK/NG） |
+| `POST /MachineApi/Exit` | 異常退室・ABORT |
+
+### WorkInstructionApp → MiniPC（コールバック・プッシュ型）
+
+| エンドポイント | 用途 |
+|--------------|------|
+| `POST /api/instructionResult` | 作業指示の OK/NG 結果をプッシュ通知 |
 
 ---
 
@@ -90,56 +128,23 @@ graph TB
 
 | テーブル | 役割 |
 |---------|------|
-| `process_master` | 工程マスタ（例: STA工程, COA工程） |
-| `cells` | セル管理（1工程 = 1セル） |
+| `process_master` | 工程マスタ（例: STA 工程、COA 工程） |
+| `cells` | セル管理（1 工程 = 1 セル） |
 | `zones` | ゾーン管理（セル内の物理ポジション） |
 | `process_definition` | 工程定義 JSON（バージョン管理） |
 | `work_instruction_master` | 作業指示マスタ（タブレット表示内容） |
 | `process_file_sequence` | 工程 Jsonファイル順序・バージョン管理 |
 | `users` | 作業者マスタ |
-| `ip_numbering` | IP アドレス採番管理 |
+| `ip_numbering` | IP アドレス採番管理（空きプール） |
 
 ### トランザクション系
 
 | テーブル | 役割 |
 |---------|------|
-| `process_execution` | 工程実行レコード（1 マシン × 1 工程） |
+| `process_execution` | 工程実行レコード（シリアル番号 × 1 工程） |
 | `process_step_execution` | Step ごとの実行結果 |
 | `work_instruction_execution` | 作業指示の実行状態（PENDING/OK/NG/SKIPPED） |
 | `process_file_execution` | MiniPC ファイル実行進捗（PENDING/RUNNING/OK/NG） |
-
----
-
-## API 早見表
-
-### MachineApi（MiniPC → HostPC）
-
-| エンドポイント | 用途 |
-|--------------|------|
-| `POST /MachineApi/Enter` | 製品入室・工程開始 |
-| `POST /MachineApi/Complete` | 工程完了（OK/NG） |
-| `POST /MachineApi/Exit` | 異常退室・ABORT |
-
-### StepApi（MiniPC → HostPC）
-
-| エンドポイント | 用途 |
-|--------------|------|
-| `POST /StepApi/UpdateStep` | Step 開始通知・CurrentStepKey 更新 |
-| `GET /StepApi/InstructionStatus` | オペレーター確認状態のポーリング |
-| `POST /StepApi/RecordStep` | Step 完了を記録 |
-
-### ProcessFileApi（MiniPC → HostPC）— 工程 Jsonファイル
-
-| エンドポイント | 用途 |
-|--------------|------|
-| `GET /ProcessFileApi/Next?serialNo=` | 次に実行するファイルを問い合わせ |
-| `GET /ProcessFileApi/FileContent/{seqId}` | ファイル内容を取得（ハッシュ不一致時） |
-
-### InstructionApi（タブレット → HostPC）
-
-| エンドポイント | 用途 |
-|--------------|------|
-| `POST /InstructionApi/Complete` | オペレーターが作業指示を OK/NG で完了 |
 
 ---
 
@@ -149,27 +154,11 @@ graph TB
 # 1. ベーススキーマを実行
 mysql -u root -p < SQL/schema.sql
 
-# 2. 追加マイグレーションを順番に実行（WorkInstructionApp の SQL/ ディレクトリ参照）
+# 2. WorkInstructionApp の追加マイグレーションを順番に実行
 mysql -u root -p prod_process_execution_db < 20260408_prod_db_integration.sql
 mysql -u root -p prod_process_execution_db < 20260603_spica_schema_migration.sql
 mysql -u root -p prod_process_execution_db < 20260603_process_file_tables.sql
 ```
-
----
-
-## 工程 Jsonファイル バージョン管理
-
-`process_file_sequence` テーブルで管理。同一ファイルの複数バージョンを保持し、`IsActive=1` が現在使用中。
-
-```
-ファイル更新時:
-  旧レコード IsActive=0 → 新レコード INSERT (FileVersion+1, IsActive=1)
-
-ロールバック時:
-  管理画面の「履歴」→「有効化」ボタンで旧バージョンを再アクティブ化
-```
-
-管理画面: **WorkInstructionApp の マスタ → 工程 Jsonファイル**
 
 ---
 
@@ -178,4 +167,4 @@ mysql -u root -p prod_process_execution_db < 20260603_process_file_tables.sql
 | リポジトリ | 役割 |
 |-----------|------|
 | [WorkInstructionApp](https://github.com/namagi14-lab/WorkInstructionApp) | HostPC アプリ本体（ASP.NET MVC 5） |
-| [ProcessDashboard](https://github.com/namagi14-lab/ProcessDashboard) | ダッシュボード（SignalR リアルタイム表示） |
+| [ProcessDashboard](https://github.com/namagi14-lab/ProcessDashboard) | ダッシュボード（SignalR リアルタイム表示、別プログラム） |
