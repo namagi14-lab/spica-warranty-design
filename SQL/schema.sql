@@ -14,6 +14,17 @@ USE prod_process_execution_db;
 -- マスターテーブル
 -- ============================================================
 
+-- 作業者マスタ
+CREATE TABLE IF NOT EXISTS users (
+  UserId    INT          NOT NULL AUTO_INCREMENT,
+  UserCode  VARCHAR(50)  NOT NULL COMMENT '社員番号・ログインID等',
+  UserName  VARCHAR(100) NOT NULL COMMENT '表示名',
+  IsActive  TINYINT(1)   NOT NULL DEFAULT 1,
+  CreatedAt DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (UserId),
+  UNIQUE KEY uq_user_code (UserCode)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- 工程マスタ
 CREATE TABLE IF NOT EXISTS process_master (
   ProcessId    INT          NOT NULL AUTO_INCREMENT,
@@ -131,12 +142,13 @@ CREATE TABLE IF NOT EXISTS work_instruction_execution (
   ExecutionId       BIGINT   NOT NULL COMMENT 'FK: process_execution',
   InstructionId     INT      NOT NULL COMMENT 'FK: work_instruction_master',
   ResultStatus      ENUM('PENDING','OK','NG','SKIPPED') NOT NULL DEFAULT 'PENDING',
-  ExecutedBy        VARCHAR(100)       COMMENT '完了した作業者名',
+  ExecutedByUserId  INT                COMMENT 'FK: users（完了した作業者）',
   ExecutedAt        DATETIME           COMMENT '完了日時',
   PRIMARY KEY (InstructionExecId),
   KEY idx_exec_status (ExecutionId, ResultStatus),
-  CONSTRAINT fk_wie_exec FOREIGN KEY (ExecutionId)  REFERENCES process_execution      (ExecutionId),
-  CONSTRAINT fk_wie_instr FOREIGN KEY (InstructionId) REFERENCES work_instruction_master (InstructionId)
+  CONSTRAINT fk_wie_exec  FOREIGN KEY (ExecutionId)       REFERENCES process_execution      (ExecutionId),
+  CONSTRAINT fk_wie_instr FOREIGN KEY (InstructionId)     REFERENCES work_instruction_master (InstructionId),
+  CONSTRAINT fk_wie_user  FOREIGN KEY (ExecutedByUserId)  REFERENCES users                  (UserId)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- IPアドレス採番管理

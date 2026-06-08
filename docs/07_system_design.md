@@ -13,7 +13,7 @@
 | MiniPC（治具） | 各ゾーンに設置。製品マシンを制御し、WorkInstructionApp と通信する。**HTTP サーバーも兼ねる（コールバック受信）** |
 | WorkInstructionApp（HostPC） | 工程トランザクションを管理する Web アプリ。オペレーター UI・MiniPC API・ダッシュボード通知を担う |
 | タブレット | **作業指示専用**。オペレーターが作業内容を確認し OK/NG を入力する |
-| ダッシュボード PC | **別プログラム（ProcessDashboard）**。工程の進捗をリアルタイムで別画面に表示する |
+| ダッシュボード PC | **別プログラム（ProcessDashboard）**。工程の進捗をリアルタイムで別画面に表示する。**SignalR で更新通知を受け取り、データは MySQL へ直接 SQL（SELECT のみ）で取得する。WorkInstructionApp の API を経由しない** |
 | オペレーター | 作業者。タブレットで作業指示を確認し OK / NG を入力する |
 | DBEntryApp | 外部システム。工程マスタ・工程定義 JSON を管理する |
 | 管理者 | WorkInstructionApp の管理画面で各種マスタを設定する |
@@ -31,8 +31,9 @@ sequenceDiagram
     actor Op as オペレーター
     participant Tablet as タブレット（作業指示専用）
     participant Dash as ダッシュボード（別プログラム）
-    participant MiniPC as MiniPC（治具）
     participant App as WorkInstructionApp
+    participant DB as MySQL
+    participant MiniPC as MiniPC（治具）
     participant Machine as 製品マシン
 
     Note over App,Machine: 【事前準備】管理者が工程・Jsonファイル・作業指示を登録済み
@@ -52,7 +53,8 @@ sequenceDiagram
             Tablet->>App: POST /MachineApi/Enter { serialNo }
             App->>App: process_execution 開始 / WI・ファイル実行レコードを PENDING 一括生成
             App-->>Tablet: { success: true }
-            App-)Dash: SignalR: ダッシュボード更新
+            App-)Dash: SignalR: 更新通知（入室）
+            Dash->>DB: SELECT（直接SQL参照）
         end
 
         rect rgb(255,255,200)
@@ -86,10 +88,16 @@ sequenceDiagram
                 MiniPC->>App: POST /MachineApi/Complete { serialNo, result: NG }
                 Note over Op,Machine: ラインアウト → 修正 → 再投入
             end
-            App-)Dash: SignalR: ダッシュボード更新（退室）
+            App-)Dash: SignalR: 更新通知（退室）
+            Dash->>DB: SELECT（直接SQL参照）
         end
     end
 ```
+
+> **ダッシュボードのデータ取得方針**:  
+> SignalR はデータを持たない「更新トリガー通知」のみに使用する。  
+> データ本体はダッシュボードが MySQL へ直接 SQL（SELECT のみ）を発行して取得する。  
+> INSERT / UPDATE は WorkInstructionApp のみが行い、ダッシュボードは書き込みを行わない。
 
 ---
 
@@ -151,7 +159,8 @@ sequenceDiagram
     App->>DB: process_file_sequence（IsActive=1）から PENDING を一括 INSERT<br/>→ process_file_execution × M（StepOrder 順）
 
     App-->>Tablet: { success: true }
-    App-)Dash: SignalR: ダッシュボードへ入室通知
+    App-)Dash: SignalR: 更新通知（入室）
+    Dash->>DB: SELECT（直接SQL参照）
 ```
 
 ---
@@ -227,7 +236,7 @@ sequenceDiagram
 
             Op->>Tablet: OK または NG を押す
             Tablet->>App: POST /InstructionApi/Complete { instructionExecId, result, userId }
-            App->>DB: work_instruction_execution 更新（ResultStatus, ExecutedBy, ExecutedAt）
+            App->>DB: work_instruction_execution 更新（ResultStatus, ExecutedByUserId, ExecutedAt）
 
             App->>MiniPC: POST /api/instructionResult { serialNo, stepKey, result: OK/NG }
             Note right of App: MiniPC のエンドポイントへプッシュ通知<br/>（MiniPC IP は ゾーン設定 or 登録情報から解決）
@@ -264,20 +273,23 @@ sequenceDiagram
         MiniPC->>App: POST /MachineApi/Complete { serialNo, result: OK }
         App->>DB: process_execution.Status = OK / EndTime = NOW()
         App->>DB: 残 work_instruction_execution.Status = SKIPPED
-        App-)Dash: SignalR: 退室・ゾーンを空き状態に更新
+        App-)Dash: SignalR: 更新通知（退室 OK）
+        Dash->>DB: SELECT（直接SQL参照）
 
     else NG 発生（工程失敗）
         MiniPC->>App: POST /MachineApi/Complete { serialNo, result: NG }
         App->>DB: process_execution.Status = NG / EndTime = NOW()
         App->>DB: 残 work_instruction_execution.Status = SKIPPED
-        App-)Dash: SignalR: NG 退室
+        App-)Dash: SignalR: 更新通知（退室 NG）
+        Dash->>DB: SELECT（直接SQL参照）
         Note over MiniPC,Dash: 製品はラインアウト → 原因調査・修正<br/>再投入時は新 process_execution（RetryOfExecutionId で元 NG と紐付け）
 
     else 異常退室・緊急停止
         MiniPC->>App: POST /MachineApi/Exit { serialNo }
         App->>DB: process_execution.Status = ABORT / EndTime = NOW()
         App->>DB: 残 work_instruction_execution / process_file_execution = SKIPPED
-        App-)Dash: SignalR: ゾーンを空き状態に更新
+        App-)Dash: SignalR: 更新通知（ABORT）
+        Dash->>DB: SELECT（直接SQL参照）
     end
 
     App-->>MiniPC: { success: true }
@@ -344,7 +356,7 @@ sequenceDiagram
     App->>DB: process_file_sequence INSERT（ProcessId, StepOrder, FileName, FileHash, FileContent）
 
     Admin->>App: 6. ユーザー登録（/Master/Users）
-    App->>DB: users INSERT（UserName）
+    App->>DB: users INSERT（UserCode, UserName）
 
     Note over Admin,DB: セットアップ完了 → 稼働可能
 ```

@@ -18,7 +18,7 @@ graph TB
     subgraph HostPC
         H["🖥️ WorkInstructionApp\nASP.NET MVC 5"]
         DB[("🗄️ MySQL\nprod_process_execution_db")]
-        H <-->|SQL| DB
+        H <-->|SQL 書込専用| DB
     end
 
     subgraph オペレーター側
@@ -34,11 +34,18 @@ graph TB
     H -->|コールバック HTTP| M
     T -->|HTTP| H
     H -->|SignalR| T
-    H -->|SignalR| Dash
+    H -->|SignalR（更新通知）| Dash
+    Dash -->|SQL READ ONLY（直接参照）| DB
     DBE -->|工程定義同期| H
 ```
 
 > **マシン特定の原則**: すべての処理でマシンを特定するキーは**シリアル番号**を使用する。
+
+> **DBアクセスポリシー**:
+> - **INSERT / UPDATE**: WorkInstructionApp のみが行う（書き込みの一元管理）
+> - **SELECT（READ ONLY）**: ダッシュボード（ProcessDashboard）は MySQL へ直接 SQL を発行してデータを参照する
+> - SignalR はダッシュボードへの「更新トリガー通知」として使用し、データ本体はダッシュボードが DB から直接取得する
+> - MySQLユーザーはアプリケーション別に分離する（WorkInstructionApp 用: 全権限 / ProcessDashboard 用: SELECT のみ）
 
 ---
 
