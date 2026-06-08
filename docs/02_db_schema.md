@@ -10,6 +10,7 @@
 
 | テーブル名 | 種別 | 説明 |
 |-----------|------|------|
+| `users` | マスター | 作業者マスタ |
 | `cells` | マスター | セル（ライン）管理 |
 | `zones` | マスター | ゾーン（位置）管理 |
 | `process_master` | マスター | 工程マスタ |
@@ -19,6 +20,21 @@
 | `process_step_execution` | トランザクション | Stepごとの実行結果 |
 | `work_instruction_execution` | トランザクション | 作業指示の実行状態（PENDING/OK/NG/SKIPPED） |
 | `ip_numbering` | トランザクション | IPアドレス採番管理 |
+
+---
+
+## users（作業者マスタ）
+
+作業者（オペレーター）を管理するマスターテーブル。  
+`work_instruction_execution.ExecutedByUserId` から参照される。
+
+| 列名 | 型 | キー | NULL | デフォルト | 説明 |
+|------|----|------|------|-----------|------|
+| UserId | INT AUTO_INCREMENT | PK | NO | | ユーザーID |
+| UserCode | VARCHAR(50) | UQ | NO | | 社員番号・ログインID等 |
+| UserName | VARCHAR(100) | | NO | | 表示名 |
+| IsActive | TINYINT(1) | | NO | 1 | 有効フラグ |
+| CreatedAt | DATETIME | | NO | CURRENT_TIMESTAMP | 登録日時 |
 
 ---
 
@@ -195,7 +211,7 @@ ExecutionId=25  RetryOf=10    Status=OK    ← 再作業
 | ExecutionId | BIGINT | FK | NO | | FK → process_execution |
 | InstructionId | INT | FK | NO | | FK → work_instruction_master |
 | ResultStatus | ENUM('PENDING','OK','NG','SKIPPED') | | NO | 'PENDING' | 状態 |
-| ExecutedBy | VARCHAR(100) | | YES | NULL | 完了した作業者名 |
+| ExecutedByUserId | INT | FK | YES | NULL | FK → users（完了した作業者） |
 | ExecutedAt | DATETIME | | YES | NULL | 完了日時 |
 
 ### ResultStatusの遷移
