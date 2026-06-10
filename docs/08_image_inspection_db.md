@@ -12,8 +12,7 @@
 | 項目 | 内容 |
 |------|------|
 | DB名 | `image_inspection_db` |
-| RDBMS | MySQL（HostPC 上） |
-| 文字コード | utf8mb4 |
+| RDBMS | SQL Server（km.local / `10.183.29.246`） |
 | 管理主体 | 画像検査Program（C0L-0162）がスキーマ・データを管理 |
 | WorkInstructionApp の役割 | 読み取り・作業指示結果の更新のみ（スキーマ変更は行わない） |
 
@@ -70,23 +69,48 @@ WAIT  →  NG     WorkInstructionApp がオペレーターの NG を受けて更
 
 ---
 
-## 4. WorkInstructionApp の接続設定
+## 4. サーバー接続情報
 
-WorkInstructionApp は `image_inspection_db` に対して専用の接続文字列を持ちます。  
-`prod_process_execution_db` とは別の接続を使用します。
+`image_inspection_db` は **km.local（固定IP: `10.183.29.246`）** 上の SQL Server として構築済みです。  
+バックアップファイルからリストア済みです。
 
-```xml
-<!-- Web.config / appsettings の例 -->
-<add name="ImageInspectionDb"
-     connectionString="Server=localhost;Database=image_inspection_db;Uid=app_image;Pwd=****;" />
+### 接続先
+
+| 項目 | 値 |
+|------|-----|
+| サーバー | `10.183.29.246,1433` |
+| データベース | `image_inspection_db` |
+| 認証方式 | SQL Server 認証 |
+| ユーザー名 | `spica_test_user` |
+| パスワード | `hH8$2trwYf6F` |
+| 権限 | `db_owner`（全権限） |
+
+### 接続文字列（ADO.NET / .NET アプリ用）
+
+```
+Server=10.183.29.246,1433;
+Database=image_inspection_db;
+User Id=spica_test_user;
+Password=hH8$2trwYf6F;
 ```
 
-MySQLユーザーの権限:
+### SSMS での接続
 
-| ユーザー | 権限 | 対象 |
-|---------|------|------|
-| `app_image` | SELECT, UPDATE | `image_inspection_db` の全テーブル |
-| 画像検査Program 用ユーザー | INSERT, UPDATE, SELECT | `image_inspection_db` の全テーブル |
+| 設定項目 | 値 |
+|---------|-----|
+| サーバー名 | `10.183.29.246,1433` |
+| 認証 | SQL Server 認証 |
+| ユーザー名 | `spica_test_user` |
+| パスワード | `hH8$2trwYf6F` |
+
+### WorkInstructionApp の接続設定例
+
+`prod_process_execution_db` とは別の接続文字列を使用します。
+
+```xml
+<!-- appsettings.json / Web.config の例 -->
+<add name="ImageInspectionDb"
+     connectionString="Server=10.183.29.246,1433;Database=image_inspection_db;User Id=spica_test_user;Password=hH8$2trwYf6F;" />
 
 ---
 
