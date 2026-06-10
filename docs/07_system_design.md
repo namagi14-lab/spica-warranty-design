@@ -13,7 +13,7 @@
 | MiniPC（治具） | 各ゾーンに設置。製品マシンを制御し、WorkInstructionApp と通信する。**HTTP サーバーも兼ねる（コールバック受信）** |
 | WorkInstructionApp（HostPC） | 工程トランザクションを管理する Web アプリ。オペレーター UI・MiniPC API・ダッシュボード通知を担う |
 | タブレット | **作業指示専用**。オペレーターが作業内容を確認し OK/NG を入力する |
-| ダッシュボード PC | **別プログラム（ProcessDashboard）**。工程の進捗をリアルタイムで別画面に表示する。**SignalR で更新通知を受け取り、データは MySQL へ直接 SQL（SELECT のみ）で取得する。WorkInstructionApp の API を経由しない** |
+| DashboardProgram（HostPC） | **HostPC 上で動作するプログラム**。ブラウザ（モニター）で工程の進捗をリアルタイム表示する。**SignalR で更新通知を受け取り、データは MySQL へ直接 SQL（SELECT のみ）で取得する。WorkInstructionApp の API を経由しない** |
 | オペレーター | 作業者。タブレットで作業指示を確認し OK / NG を入力する |
 | DBEntryApp | 外部システム。工程マスタ・工程定義 JSON を管理する |
 | 管理者 | WorkInstructionApp の管理画面で各種マスタを設定する |
@@ -30,7 +30,7 @@
 sequenceDiagram
     actor Op as オペレーター
     participant Tablet as タブレット（作業指示専用）
-    participant Dash as ダッシュボード（別プログラム）
+    participant Dash as DashboardProgram（HostPC・ブラウザ）
     participant App as WorkInstructionApp
     participant DB as MySQL
     participant MiniPC as MiniPC（治具）
@@ -140,7 +140,7 @@ sequenceDiagram
     participant Tablet as タブレット（作業指示専用）
     participant App as WorkInstructionApp
     participant DB as MySQL
-    participant Dash as ダッシュボード（別プログラム）
+    participant Dash as DashboardProgram（HostPC・ブラウザ）
 
     Op->>Tablet: シリアル番号を入力（バーコードスキャン等）
     Tablet->>App: POST /MachineApi/Enter { serialNo }
@@ -267,7 +267,7 @@ sequenceDiagram
     participant MiniPC as MiniPC（治具）
     participant App as WorkInstructionApp
     participant DB as MySQL
-    participant Dash as ダッシュボード（別プログラム）
+    participant Dash as DashboardProgram（HostPC・ブラウザ）
 
     alt 正常完了（全 Step OK）
         MiniPC->>App: POST /MachineApi/Complete { serialNo, result: OK }
