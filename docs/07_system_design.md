@@ -387,6 +387,118 @@ erDiagram
 
 ---
 
+## 9. 画像検査工程フロー（暫定構成：専用DB経由）
+
+> **この構成は暫定対応です。** 画像検査Program（C0L-0162）が現行のAPI連携に対応できないため、  
+> `image_inspection_db`（HostPC上の専用DB）を仲介する構成を採用しています。  
+> 将来的には通常の MiniPC → WorkInstructionApp API 構成に統一する予定です。
+
+### 9-1. 画像検査での自動ステップ（作業指示なし）
+
+```mermaid
+sequenceDiagram
+    participant IMG as 画像検査Program（C0L-0162）
+    participant IDB as image_inspection_db（画像検査専用DB）
+
+    IMG->>IDB: INSERT image_analysis_sessions（RUNNING）
+    IMG->>IMG: スキャン実行・画像解析
+    IMG->>IDB: UPDATE image_analysis_sessions（OK / NG）
+```
+
+---
+
+### 9-2. 画像検査での手動ステップ（作業指示あり）
+
+作業指示が必要なステップでは、画像検査Program が `image_inspection_db` に作業指示レコードを書き込む。  
+WorkInstructionApp の作業指示Program（タブレットタブ）が DB をポーリングして検知し、タブレットに表示する。  
+オペレーターが OK/NG を押すと、WorkInstructionApp が `image_inspection_db` を更新し、画像検査Program が結果を読み取る。
+
+```mermaid
+sequenceDiagram
+    actor Op as オペレーター
+    participant IMG as 画像検査Program（C0L-0162）
+    participant IDB as image_inspection_db（画像検査専用DB）
+    participant App as WorkInstructionApp（作業指示Program）
+    participant T as タブレット
+
+    IMG->>IDB: INSERT image_analysis_sessions<br/>（TabletNo, SerialNo, RaspiNo, OperatorMsg, RaspiExeStatus=WAIT）
+
+    Note over App,IDB: 作業指示Program が一定周期でポーリング
+
+    App->>IDB: GET /api/ImageAnalysisJobs/GetTablet（TabletNo指定）
+    IDB-->>App: 作業待ちセッション一覧（WAIT レコード）
+
+    App->>IDB: LOCK（先頭行を IsLocked=1 に更新）
+
+    App-)T: SignalR or 画面表示: 作業指示を表示<br/>（OperatorMsg, SerialNo 等）
+
+    T-->>Op: 指示内容を表示
+
+    Op->>T: OK または NG を選択
+
+    T->>App: PUT /api/ImageAnalysisJobs/PutTabletExeStatus<br/>{ Id, ExeStatus: OK/NG, SerialNo, StartSequenceNo }
+    App->>IDB: UPDATE image_analysis_sessions<br/>（RaspiExeStatus = OK / NG）
+    App-->>T: 成功レスポンス
+
+    Note over App,IDB: readback確認（最大3回）
+    App->>IDB: GET /api/ImageAnalysisJobs/GetCurrentSessionData（Id）
+    IDB-->>App: { RaspiExeStatus: "OK" / "NG" }
+
+    IMG->>IDB: SELECT image_analysis_sessions（RaspiExeStatus を確認）
+    IDB-->>IMG: { RaspiExeStatus: "OK" / "NG" }
+
+    IMG->>IMG: 結果に応じて次ステップへ
+```
+
+---
+
+### 9-3. image_inspection_db の主要テーブル（概要）
+
+`image_inspection_db` は画像検査Program が管理する専用DBです。  
+WorkInstructionApp はこのDBに対して **読み取り・更新のみ** 行い、スキーマ管理は画像検査Program 側が行います。  
+詳細は **[08_image_inspection_db.md](08_image_inspection_db.md)** を参照してください。
+
+| テーブル | 主な用途 |
+|---------|---------|
+| `image_analysis_sessions` | 画像検査ジョブ・作業指示のセッション管理（WAIT/OK/NG） |
+
+WorkInstructionApp が使用する主なカラム:
+
+| カラム名 | 内容 |
+|---------|------|
+| `Id` | セッションID（LOCK/OK/NG操作のキー） |
+| `TabletNo` | タブレット識別番号 |
+| `SerialNo` | マシンシリアル番号 |
+| `RaspiNo` | RaspiNo（基板識別） |
+| `OperatorMsg` | タブレットに表示する作業指示文字列 |
+| `SequenceNo` | シーケンス番号 |
+| `StartSequenceNo` | 開始シーケンス番号 |
+| `SequenceType` | シーケンス種別 |
+| `MachineCode` | マシンコード |
+| `RaspiExeStatus` | 実行状態（`WAIT` / `OK` / `NG`） |
+| `IsLocked` | LOCK状態（0: 未LOCK, 1: LOCK中） |
+
+---
+
+### 9-4. WorkInstructionApp に追加する API エンドポイント（画像検査工程向け）
+
+画像検査専用DB との仲介のため、WorkInstructionApp に以下のエンドポイントを追加します。
+
+| エンドポイント | メソッド | 用途 |
+|--------------|---------|------|
+| `/api/ImageAnalysisJobs/GetCheck` | GET | 疎通確認（作業指示Program の PingCheck 用） |
+| `/api/ImageAnalysisJobs/GetTablet` | GET | 作業待ちセッション一覧取得（TabletNo 指定） |
+| `/api/ImageAnalysisJobs/LockById/{id}` | PUT | 先頭行を LOCK（IsLocked=1 に更新） |
+| `/api/ImageAnalysisJobs/UnlockById/{id}` | PUT | LOCK 解除（IsLocked=0 に更新） |
+| `/api/ImageAnalysisJobs/PutTabletExeStatus` | PUT | OK/NG 結果を反映（RaspiExeStatus 更新） |
+| `/api/ImageAnalysisJobs/GetCurrentSessionData/{id}` | GET | readback 確認（RaspiExeStatus 取得） |
+| `/api/ImageAnalysisJobs/GetTabletRelationList` | GET | StartSequenceNo 候補一覧取得 |
+| `/api/ImageAnalysisJobs/DeclareMasterSlaveRelation` | PUT | RaspiNo ↔ SerialNo 関連宣言 |
+| `/api/ImageAnalysisJobs/DeclareChartNoWithSNAndAreaName` | PUT | SerialNo + AreaNo から ChartNo 自動宣言 |
+| `/api/ImageAnalysisJobs/DeclareChartNo` | PUT | 手動 ChartNo 宣言 |
+
+---
+
 ## API 早見表
 
 ### タブレット → WorkInstructionApp（オペレーター操作）
@@ -415,3 +527,18 @@ erDiagram
 | `POST /api/instructionResult` | 作業指示の OK/NG をプッシュ通知 |
 
 > MiniPC の IP は ゾーン設定またはMiniPC 起動時の登録情報から解決する。
+
+### 作業指示Program → WorkInstructionApp（画像検査工程専用・暫定）
+
+| エンドポイント | 用途 |
+|--------------|------|
+| `GET /api/ImageAnalysisJobs/GetCheck` | 疎通確認 |
+| `GET /api/ImageAnalysisJobs/GetTablet` | 作業待ちセッション一覧取得 |
+| `PUT /api/ImageAnalysisJobs/LockById/{id}` | LOCK |
+| `PUT /api/ImageAnalysisJobs/UnlockById/{id}` | UNLOCK |
+| `PUT /api/ImageAnalysisJobs/PutTabletExeStatus` | OK/NG 結果反映 |
+| `GET /api/ImageAnalysisJobs/GetCurrentSessionData/{id}` | readback 確認 |
+| `GET /api/ImageAnalysisJobs/GetTabletRelationList` | StartSequenceNo 候補取得 |
+| `PUT /api/ImageAnalysisJobs/DeclareMasterSlaveRelation` | RaspiNo ↔ SerialNo 関連宣言 |
+| `PUT /api/ImageAnalysisJobs/DeclareChartNoWithSNAndAreaName` | ChartNo 自動宣言 |
+| `PUT /api/ImageAnalysisJobs/DeclareChartNo` | 手動 ChartNo 宣言 |
