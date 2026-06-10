@@ -18,7 +18,14 @@ graph TB
     subgraph HostPC
         H["🖥️ WorkInstructionApp\nASP.NET MVC 5"]
         DB[("🗄️ MySQL\nprod_process_execution_db")]
+        IDB[("🗄️ MySQL\nimage_inspection_db\n画像検査専用")]
         H <-->|SQL 書込専用| DB
+        H <-->|SQL 読取・更新| IDB
+    end
+
+    subgraph 画像検査PC
+        IMG["🖥️ 画像検査Program\nC0L-0162"]
+        IMG -->|SQL 直接書込| IDB
     end
 
     subgraph オペレーター側
@@ -38,6 +45,11 @@ graph TB
     Dash -->|SQL READ ONLY（直接参照）| DB
     DBE -->|工程定義同期| H
 ```
+
+> **画像検査工程の暫定構成について**:  
+> 画像検査Program（C0L-0162）は現行システムのAPI連携に対応していないため、暫定的に専用DB（`image_inspection_db`）を介した構成を採用している。  
+> WorkInstructionApp が `image_inspection_db` を読み取り・更新することで、タブレットへの作業指示表示・OK/NG返却を仲介する。  
+> **将来的には通常のMiniPC→API構成に統一する予定。**（→ 詳細は [08_image_inspection_db.md](docs/08_image_inspection_db.md) を参照）
 
 > **マシン特定の原則**: すべての処理でマシンを特定するキーは**シリアル番号**を使用する。
 
@@ -94,7 +106,8 @@ graph TB
 | 04 | [api_spec.md](docs/04_api_spec.md) | MachineApi / StepApi / InstructionApi 仕様 |
 | 05 | [sequence.md](docs/05_sequence.md) | 基本シーケンス図 |
 | 06 | [process_file_api.md](docs/06_process_file_api.md) | 工程 Jsonファイル API 仕様（/ProcessFileApi） |
-| **07** | **[system_design.md](docs/07_system_design.md)** | **システム設計書（Mermaid シーケンス 8本）← メイン** |
+| **07** | **[system_design.md](docs/07_system_design.md)** | **システム設計書（Mermaid シーケンス 9本）← メイン** |
+| 08 | [image_inspection_db.md](docs/08_image_inspection_db.md) | 画像検査専用DB 仕様（暫定構成）|
 | — | [SQL/schema.sql](SQL/schema.sql) | 完全 DDL（CREATE TABLE） |
 | — | [docs/process_file_samples/](docs/process_file_samples/) | 工程 JSON サンプルファイル |
 
