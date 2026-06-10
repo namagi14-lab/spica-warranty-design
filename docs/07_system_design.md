@@ -10,10 +10,12 @@
 | アクター | 役割 |
 |---------|------|
 | 製品マシン | 保証対象の製品。MiniPC からコマンドを受け取る |
-| MiniPC（治具） | 各ゾーンに設置。製品マシンを制御し、WorkInstructionApp と通信する。**HTTP サーバーも兼ねる（コールバック受信）** |
-| WorkInstructionApp（HostPC） | 工程トランザクションを管理する Web アプリ。オペレーター UI・MiniPC API・ダッシュボード通知を担う |
-| タブレット | **作業指示専用**。オペレーターが作業内容を確認し OK/NG を入力する |
-| DashboardProgram（HostPC） | **HostPC 上で動作するプログラム**。ブラウザ（モニター）で工程の進捗をリアルタイム表示する。**SignalR で更新通知を受け取り、データは MySQL へ直接 SQL（SELECT のみ）で取得する。WorkInstructionApp の API を経由しない** |
+| MiniPC（ライン内） | 各ゾーンに設置。**保証工程制御Program（C0L-0161）**が動作。製品マシンを制御し、WorkInstructionApp と通信する。**HTTP サーバーも兼ねる（コールバック受信）** |
+| WorkInstructionApp（HostPC） | **C0L-0160**。工程トランザクションを管理する Web アプリ（ASP.NET MVC 5）。MiniPC API・タブレット向け SignalR・DashboardProgram 向け通知を担う |
+| タブレット（ライン内） | **作業指示Program（C0L-0163）**が動作。オペレーターが作業内容を確認し OK/NG を入力する |
+| 画像検査PC（ライン内） | **画像検査Program（C0L-0162）**が動作。実機スキャナで画像検査を行い、`image_inspection_db` へ直接書き込む（暫定構成） |
+| DashboardProgram（HostPC） | **C0L-0164**。HostPC 上で動作。SignalR で更新通知を受け取り、データは MySQL へ直接 SQL（SELECT のみ）で取得する。**表示はライン外のダッシュボード表示専用デバイスのブラウザで行う** |
+| ダッシュボード表示デバイス（ライン外） | ブラウザで DashboardProgram にアクセスし、工程の進捗をモニター表示する専用デバイス |
 | オペレーター | 作業者。タブレットで作業指示を確認し OK / NG を入力する |
 | DBEntryApp | 外部システム。工程マスタ・工程定義 JSON を管理する |
 | 管理者 | WorkInstructionApp の管理画面で各種マスタを設定する |

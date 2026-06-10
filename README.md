@@ -9,29 +9,26 @@
 
 ```mermaid
 graph TB
-    subgraph 製造ライン
+    subgraph ライン内
         P["🖨️ 製品マシン（Spica）"]
-        M["💻 MiniPC（治具）\nHTTPクライアント + HTTPサーバー"]
+        M["💻 MiniPC（治具）\n保証工程制御Program\nC0L-0161"]
+        T["📱 タブレット\n作業指示Program C0L-0163\nが表示"]
+        IMG["🖥️ 画像検査PC\n画像検査Program\nC0L-0162"]
         P <-->|KCFGコマンド LAN| M
     end
 
     subgraph HostPC
-        H["🖥️ WorkInstructionApp\nASP.NET MVC 5"]
+        H["🖥️ WorkInstructionApp\nC0L-0160 / ASP.NET MVC 5"]
         DB[("🗄️ MySQL\nprod_process_execution_db")]
         IDB[("🗄️ MySQL\nimage_inspection_db\n画像検査専用")]
-        Dash["🌐 DashboardProgram\nブラウザ表示（モニター）"]
+        Dash["🌐 DashboardProgram\nC0L-0164"]
         H <-->|SQL 書込専用| DB
         H <-->|SQL 読取・更新| IDB
         Dash -->|SQL READ ONLY（直接参照）| DB
     end
 
-    subgraph 画像検査PC
-        IMG["🖥️ 画像検査Program\nC0L-0162"]
-        IMG -->|SQL 直接書込| IDB
-    end
-
-    subgraph オペレーター側
-        T["📱 タブレット\n作業指示専用"]
+    subgraph ライン外
+        DispDev["🖥️ ダッシュボード表示デバイス\nブラウザでDashboardProgramを表示"]
     end
 
     subgraph 外部
@@ -41,8 +38,10 @@ graph TB
     M -->|WebAPI HTTP| H
     H -->|コールバック HTTP| M
     T -->|HTTP| H
-    H -->|SignalR| T
-    H -->|SignalR（更新通知）| Dash
+    H -->|SignalR 作業指示| T
+    H -->|SignalR 更新通知| Dash
+    Dash -->|HTTP ブラウザ| DispDev
+    IMG -->|SQL 直接書込| IDB
     DBE -->|工程定義同期| H
 ```
 
