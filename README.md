@@ -19,8 +19,10 @@ graph TB
         H["🖥️ WorkInstructionApp\nASP.NET MVC 5"]
         DB[("🗄️ MySQL\nprod_process_execution_db")]
         IDB[("🗄️ MySQL\nimage_inspection_db\n画像検査専用")]
+        Dash["🌐 DashboardProgram\nブラウザ表示（モニター）"]
         H <-->|SQL 書込専用| DB
         H <-->|SQL 読取・更新| IDB
+        Dash -->|SQL READ ONLY（直接参照）| DB
     end
 
     subgraph 画像検査PC
@@ -30,7 +32,6 @@ graph TB
 
     subgraph オペレーター側
         T["📱 タブレット\n作業指示専用"]
-        Dash["🖥️ ダッシュボード PC\n別プログラム（ProcessDashboard）"]
     end
 
     subgraph 外部
@@ -42,7 +43,6 @@ graph TB
     T -->|HTTP| H
     H -->|SignalR| T
     H -->|SignalR（更新通知）| Dash
-    Dash -->|SQL READ ONLY（直接参照）| DB
     DBE -->|工程定義同期| H
 ```
 
@@ -55,9 +55,9 @@ graph TB
 
 > **DBアクセスポリシー**:
 > - **INSERT / UPDATE**: WorkInstructionApp のみが行う（書き込みの一元管理）
-> - **SELECT（READ ONLY）**: ダッシュボード（ProcessDashboard）は MySQL へ直接 SQL を発行してデータを参照する
-> - SignalR はダッシュボードへの「更新トリガー通知」として使用し、データ本体はダッシュボードが DB から直接取得する
-> - MySQLユーザーはアプリケーション別に分離する（WorkInstructionApp 用: 全権限 / ProcessDashboard 用: SELECT のみ）
+> - **SELECT（READ ONLY）**: DashboardProgram（HostPC上）は MySQL へ直接 SQL を発行してデータを参照する
+> - SignalR はダッシュボードへの「更新トリガー通知」のみに使用し、データ本体はダッシュボードが DB から直接取得する
+> - MySQLユーザーはアプリケーション別に分離する（WorkInstructionApp 用: 全権限 / DashboardProgram 用: SELECT のみ）
 
 ---
 
@@ -187,4 +187,4 @@ mysql -u root -p prod_process_execution_db < 20260603_process_file_tables.sql
 | リポジトリ | 役割 |
 |-----------|------|
 | [WorkInstructionApp](https://github.com/namagi14-lab/WorkInstructionApp) | HostPC アプリ本体（ASP.NET MVC 5） |
-| [ProcessDashboard](https://github.com/namagi14-lab/ProcessDashboard) | ダッシュボード（SignalR リアルタイム表示、別プログラム） |
+| [ProcessDashboard](https://github.com/namagi14-lab/ProcessDashboard) | DashboardProgram（HostPC上・ブラウザ表示、SignalR リアルタイム表示） |
