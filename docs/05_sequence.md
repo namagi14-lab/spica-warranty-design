@@ -118,7 +118,67 @@ sequenceDiagram
 
 ---
 
-## 4. 異常系：通信切断・再接続
+## 4. 画像検査工程ハンドオフ
+
+通常工程は MiniPC → HostPCProgram の `/ProcessFileApi/Next` 問い合わせで進むが、  
+**画像検査工程に入ると MiniPC は HostPCProgram への問い合わせを一時停止し、`image_inspection_db` を直接監視する。**
+
+```mermaid
+sequenceDiagram
+    participant M  as MiniPC<br>(C0L-0161)
+    participant H  as HostPCProgram<br>(C0L-0160)
+    participant DB as image_inspection_db<br>(SQL Server)
+    participant I  as 画像検査PC<br>(C0L-0162)
+    participant T  as 作業指示Program<br>(C0L-0163)
+    actor Op as オペレーター
+
+    Note over M,H: 通常工程ループ中
+
+    M->>H: GET /ProcessFileApi/Next?serialNo=SN123
+    H-->>M: { hasNext: true, isImageInspection: true, seqId: 5, ... }
+
+    Note over M: 画像検査モード突入<br>TCP コマンド実行は行わない<br>/Next 問い合わせを一時停止
+
+    Note over I,DB: 画像検査PC が独立して検査を実行<br>Session テーブルの ALLResult / State を更新
+
+    par MiniPC：ALLResult をポーリング
+        loop ~1秒間隔
+            M->>DB: SELECT ALLResult FROM Session<br>WHERE SerialNo='SN123'
+            DB-->>M: ALLResult='WAIT'
+        end
+    and HostPCProgram：Tablet_Interruptible をポーリング
+        loop ~1秒間隔
+            H->>DB: SELECT Id, OperatorMsg FROM Session<br>WHERE TabletExeStatus='NA'<br>AND OperatorMsg LIKE '%Tablet_Interruptible%'
+        end
+    end
+
+    Note over H: Tablet_Interruptible を検知<br>（オペレーター確認が必要な場合のみ発生）
+
+    H->>DB: UPDATE Session SET TabletExeStatus='WAIT'
+    H->>T: SignalR: { type: 'imageInspection', sessionId, serialNo, messages }
+    T-->>Op: メッセージ・OK/NG ボタン表示
+    Op->>T: OK を選択
+    T->>H: POST /ImageAnalysisJobsApi/TabletResult { sessionId, result: 'OK' }
+    H->>DB: UPDATE Session SET TabletExeStatus='OK'
+
+    Note over I: TabletExeStatus='OK' を検知して検査継続
+
+    I->>DB: UPDATE Session SET ALLResult='OK', State='Next'
+
+    Note over M: ALLResult='OK' を検知<br>→ 画像検査モード終了
+
+    M->>H: GET /ProcessFileApi/Next?serialNo=SN123
+    H-->>M: { hasNext: true, isImageInspection: false, ... }
+
+    Note over M,H: 通常工程ループ再開
+```
+
+> オペレーター確認（`Tablet_Interruptible`）は画像検査の途中で複数回発生することがある。  
+> MiniPC は ALLResult の変化のみを見ており、タブレット連携は HostPCProgram が透過的に処理する。
+
+---
+
+## 5. 異常系：通信切断・再接続
 
 ```mermaid
 sequenceDiagram
