@@ -1,6 +1,6 @@
 # 04 API仕様
 
-WorkInstructionApp（HostPC）が提供するAPIの仕様です。  
+HostPCProgram（HostPC）が提供するAPIの仕様です。  
 すべて社内ネットワーク利用を前提とし、認証は不要です。
 
 ---

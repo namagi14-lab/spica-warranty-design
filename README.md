@@ -18,7 +18,7 @@ graph TB
     end
 
     subgraph HostPC
-        H["🖥️ WorkInstructionApp\nC0L-0160 / ASP.NET MVC 5"]
+        H["🖥️ HostPCProgram\nC0L-0160 / ASP.NET MVC 5"]
         DB[("🗄️ MySQL\nprod_process_execution_db")]
         IDB[("🗄️ MySQL\nimage_inspection_db\n画像検査専用")]
         Dash["🌐 DashboardProgram\nC0L-0164"]
@@ -47,16 +47,16 @@ graph TB
 
 > **画像検査工程の暫定構成について**:  
 > 画像検査Program（C0L-0162）は現行システムのAPI連携に対応していないため、暫定的に専用DB（`image_inspection_db`）を介した構成を採用している。  
-> WorkInstructionApp が `image_inspection_db` を読み取り・更新することで、タブレットへの作業指示表示・OK/NG返却を仲介する。  
+> HostPCProgram が `image_inspection_db` を読み取り・更新することで、タブレットへの作業指示表示・OK/NG返却を仲介する。  
 > **将来的には通常のMiniPC→API構成に統一する予定。**（→ 詳細は [08_image_inspection_db.md](docs/08_image_inspection_db.md) を参照）
 
 > **マシン特定の原則**: すべての処理でマシンを特定するキーは**シリアル番号**を使用する。
 
 > **DBアクセスポリシー**:
-> - **INSERT / UPDATE**: WorkInstructionApp のみが行う（書き込みの一元管理）
+> - **INSERT / UPDATE**: HostPCProgram のみが行う（書き込みの一元管理）
 > - **SELECT（READ ONLY）**: DashboardProgram（HostPC上）は MySQL へ直接 SQL を発行してデータを参照する
 > - SignalR はダッシュボードへの「更新トリガー通知」のみに使用し、データ本体はダッシュボードが DB から直接取得する
-> - MySQLユーザーはアプリケーション別に分離する（WorkInstructionApp 用: 全権限 / DashboardProgram 用: SELECT のみ）
+> - MySQLユーザーはアプリケーション別に分離する（HostPCProgram 用: 全権限 / DashboardProgram 用: SELECT のみ）
 
 ---
 
@@ -70,7 +70,7 @@ graph TB
 
 ② 入室（オペレーターがタブレットから）
    オペレーターがタブレットでシリアル番号を入力・入室操作
-   → WorkInstructionApp が process_execution（工程実行）を開始
+   → HostPCProgram が process_execution（工程実行）を開始
    → 作業指示・ファイル実行レコードを PENDING で一括生成
    → ダッシュボードにリアルタイム反映（SignalR）
 
@@ -80,10 +80,10 @@ graph TB
    → JSON ファイルを製品マシンに実行
 
 ④ MANUAL Step でのオペレーター確認（プッシュ型）
-   MiniPC が /StepApi/UpdateStep → WorkInstructionApp が判断
+   MiniPC が /StepApi/UpdateStep → HostPCProgram が判断
    → タブレットに作業指示を表示（SignalR）
    → オペレーターが OK/NG を入力
-   → WorkInstructionApp が MiniPC のエンドポイントへコールバック
+   → HostPCProgram が MiniPC のエンドポイントへコールバック
    ※ MiniPC によるポーリングは不要
 
 ⑤ 工程完了
@@ -106,7 +106,10 @@ graph TB
 | 05 | [sequence.md](docs/05_sequence.md) | 基本シーケンス図 |
 | 06 | [process_file_api.md](docs/06_process_file_api.md) | 工程 Jsonファイル API 仕様（/ProcessFileApi） |
 | **07** | **[system_design.md](docs/07_system_design.md)** | **システム設計書（Mermaid シーケンス 9本）← メイン** |
-| 08 | [image_inspection_db.md](docs/08_image_inspection_db.md) | 画像検査専用DB 仕様（暫定構成）|
+| 08a | [image_inspection.md](docs/08_image_inspection.md) | 旧機種 RasPi 画像検査プログラム調査結果 |
+| 08b | [image_inspection_db.md](docs/08_image_inspection_db.md) | 画像検査専用 DB 仕様（暫定構成）|
+| 09 | [schedule.md](docs/09_schedule.md) | 作業指示Program 開発スケジュール |
+| 10 | [image_inspection_api.md](docs/10_image_inspection_api.md) | 画像検査連携フロー・API設計（HostPCProgram 実装仕様） |
 | — | [SQL/schema.sql](SQL/schema.sql) | 完全 DDL（CREATE TABLE） |
 | — | [docs/process_file_samples/](docs/process_file_samples/) | 工程 JSON サンプルファイル |
 
@@ -114,14 +117,14 @@ graph TB
 
 ## API 早見表
 
-### タブレット → WorkInstructionApp（オペレーター操作）
+### タブレット → HostPCProgram（オペレーター操作）
 
 | エンドポイント | 用途 |
 |--------------|------|
 | `POST /MachineApi/Enter` | **入室**（オペレーターがシリアル番号を入力） |
 | `POST /InstructionApi/Complete` | 作業指示を OK/NG で完了 |
 
-### MiniPC → WorkInstructionApp
+### MiniPC → HostPCProgram
 
 | エンドポイント | 用途 |
 |--------------|------|
@@ -133,7 +136,7 @@ graph TB
 | `POST /MachineApi/Complete` | 工程完了（OK/NG） |
 | `POST /MachineApi/Exit` | 異常退室・ABORT |
 
-### WorkInstructionApp → MiniPC（コールバック・プッシュ型）
+### HostPCProgram → MiniPC（コールバック・プッシュ型）
 
 | エンドポイント | 用途 |
 |--------------|------|
@@ -173,7 +176,7 @@ graph TB
 # 1. ベーススキーマを実行
 mysql -u root -p < SQL/schema.sql
 
-# 2. WorkInstructionApp の追加マイグレーションを順番に実行
+# 2. HostPCProgram の追加マイグレーションを順番に実行
 mysql -u root -p prod_process_execution_db < 20260408_prod_db_integration.sql
 mysql -u root -p prod_process_execution_db < 20260603_spica_schema_migration.sql
 mysql -u root -p prod_process_execution_db < 20260603_process_file_tables.sql
@@ -185,5 +188,5 @@ mysql -u root -p prod_process_execution_db < 20260603_process_file_tables.sql
 
 | リポジトリ | 役割 |
 |-----------|------|
-| [WorkInstructionApp](https://github.com/namagi14-lab/WorkInstructionApp) | HostPC アプリ本体（ASP.NET MVC 5） |
+| [WorkInstructionApp](https://github.com/namagi14-lab/WorkInstructionApp) | HostPCProgram 本体（C0L-0160 / ASP.NET MVC 5） |
 | [ProcessDashboard](https://github.com/namagi14-lab/ProcessDashboard) | DashboardProgram（HostPC上・ブラウザ表示、SignalR リアルタイム表示） |

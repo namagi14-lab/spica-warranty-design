@@ -3,7 +3,7 @@
 > **この仕様は暫定対応です。**  
 > 画像検査Program（C0L-0162）の担当開発者が現行システムのAPI連携対応が困難なため、  
 > 既存の構成をそのまま流用する形で `image_inspection_db` を仲介する構成を採用しています。  
-> **将来的には C0L-0161（MiniPC）と同様の WorkInstructionApp API 連携方式に統一する予定です。**
+> **将来的には C0L-0161（MiniPC）と同様の HostPCProgram API 連携方式に統一する予定です。**
 
 ---
 
@@ -14,7 +14,7 @@
 | DB名 | `image_inspection_db` |
 | RDBMS | SQL Server（km.local / `10.183.29.246`） |
 | 管理主体 | 画像検査Program（C0L-0162）がスキーマ・データを管理 |
-| WorkInstructionApp の役割 | 読み取り・作業指示結果の更新のみ（スキーマ変更は行わない） |
+| HostPCProgram の役割 | 読み取り・作業指示結果の更新のみ（スキーマ変更は行わない） |
 
 ---
 
@@ -22,10 +22,10 @@
 
 | 観点 | 通常工程（MiniPC） | 画像検査工程（暫定） |
 |------|------------------|-------------------|
-| トランザクション書き込み | WorkInstructionApp が `prod_process_execution_db` に書く | 画像検査Program が `image_inspection_db` に直接書く |
-| 作業指示トリガー | MiniPC → `/StepApi/UpdateStep` API → WorkInstructionApp | 画像検査Program が `image_inspection_db` に WAIT レコードを INSERT |
-| 作業指示表示 | WorkInstructionApp が SignalR でタブレットに Push | WorkInstructionApp が `image_inspection_db` をポーリングして検知し表示 |
-| OK/NG 返却 | WorkInstructionApp → MiniPC にコールバック（Push） | WorkInstructionApp が `image_inspection_db` の `RaspiExeStatus` を更新 |
+| トランザクション書き込み | HostPCProgram が `prod_process_execution_db` に書く | 画像検査Program が `image_inspection_db` に直接書く |
+| 作業指示トリガー | MiniPC → `/StepApi/UpdateStep` API → HostPCProgram | 画像検査Program が `image_inspection_db` に WAIT レコードを INSERT |
+| 作業指示表示 | HostPCProgram が SignalR でタブレットに Push | HostPCProgram が `image_inspection_db` をポーリングして検知し表示 |
+| OK/NG 返却 | HostPCProgram → MiniPC にコールバック（Push） | HostPCProgram が `image_inspection_db` の `RaspiExeStatus` を更新 |
 | 結果確認 | MiniPC がコールバックを受信 | 画像検査Program が `image_inspection_db` の `RaspiExeStatus` をポーリングして確認 |
 
 ---
@@ -35,7 +35,7 @@
 ### image_analysis_sessions
 
 画像検査ジョブおよび作業指示セッションを管理するテーブルです。  
-画像検査Program がレコードを INSERT し、WorkInstructionApp が `RaspiExeStatus` と `IsLocked` を更新します。
+画像検査Program がレコードを INSERT し、HostPCProgram が `RaspiExeStatus` と `IsLocked` を更新します。
 
 | カラム名 | 型 | NULL | 説明 |
 |---------|-----|------|------|
@@ -56,8 +56,8 @@
 #### RaspiExeStatus の遷移
 
 ```
-WAIT  →  OK     WorkInstructionApp がオペレーターの OK を受けて更新
-WAIT  →  NG     WorkInstructionApp がオペレーターの NG を受けて更新
+WAIT  →  OK     HostPCProgram がオペレーターの OK を受けて更新
+WAIT  →  NG     HostPCProgram がオペレーターの NG を受けて更新
 ```
 
 #### SerialNo の特殊値
@@ -103,7 +103,7 @@ Password=hH8$2trwYf6F;
 | ユーザー名 | `spica_test_user` |
 | パスワード | `hH8$2trwYf6F` |
 
-### WorkInstructionApp の接続設定例
+### HostPCProgram の接続設定例
 
 `prod_process_execution_db` とは別の接続文字列を使用します。
 
@@ -121,7 +121,7 @@ Password=hH8$2trwYf6F;
 作業指示Program（作業指示タブ）は一定周期（`numericUpDownSpanTablet` で設定）で以下を実行します:
 
 1. `GET /api/ImageAnalysisJobs/GetTablet?tabletNo=<TabletNo>` を呼ぶ
-2. WorkInstructionApp が `image_inspection_db` から `RaspiExeStatus=WAIT AND IsLocked=0` のレコードを取得して返す
+2. HostPCProgram が `image_inspection_db` から `RaspiExeStatus=WAIT AND IsLocked=0` のレコードを取得して返す
 3. 一覧の先頭行を自動的に LOCK して作業指示を表示する
 
 ### 5.2 LOCK の排他制御
@@ -142,11 +142,11 @@ Password=hH8$2trwYf6F;
 
 ## 6. 将来的な移行方針
 
-将来的に画像検査Program が WorkInstructionApp の API 連携に対応した際は、以下の変更を行います:
+将来的に画像検査Program が HostPCProgram の API 連携に対応した際は、以下の変更を行います:
 
 1. 画像検査Program を MiniPC（C0L-0161）と同様の API 呼び出し方式に変更
 2. `image_inspection_db` の廃止
 3. `prod_process_execution_db` に統合（`process_execution` / `work_instruction_execution` テーブルを使用）
-4. WorkInstructionApp の `/api/ImageAnalysisJobs/*` エンドポイント群を削除
+4. HostPCProgram の `/api/ImageAnalysisJobs/*` エンドポイント群を削除
 
 移行後は本ドキュメント（08_image_inspection_db.md）は不要となります。
