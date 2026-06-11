@@ -8,7 +8,7 @@
 sequenceDiagram
   participant P  as プリンター
   participant M  as MiniPC<br>(C0L-0161)
-  participant H  as HostPC<br>(WorkInstructionApp)
+  participant H  as HostPC<br>(HostPCProgram)
   participant DB as MySQL
   participant T  as タブレット
   participant D  as Dashboard

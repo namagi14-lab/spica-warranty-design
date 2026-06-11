@@ -1,6 +1,6 @@
 # 作業指示Program 開発スケジュール
 
-**対象**: C0L-0160 WorkInstructionApp / C0L-0163 作業指示Program / C0L-0164 DashboardProgram  
+**対象**: C0L-0160 HostPCProgram / C0L-0163 作業指示Program / C0L-0164 DashboardProgram  
 **主担当**: 宮本  
 **最終更新**: 2026/6/10
 
@@ -11,11 +11,11 @@
 | カテゴリ | 完了 | 進行中 | 未着手 |
 |--------|:----:|:------:|:------:|
 | 設計・資料 | 3 | 0 | 0 |
-| WorkInstructionApp — API実装 | 3 | 1 | 2 |
-| WorkInstructionApp — SignalR・Push通知 | 3 | 0 | 0 |
-| WorkInstructionApp — DBアクセス実装 | 0 | 2 | 2 |
-| WorkInstructionApp — 異常系対策 | 0 | 0 | 3 |
-| WorkInstructionApp — 管理画面 | 0 | 1 | 0 |
+| HostPCProgram — API実装 | 3 | 1 | 2 |
+| HostPCProgram — SignalR・Push通知 | 3 | 0 | 0 |
+| HostPCProgram — DBアクセス実装 | 0 | 2 | 2 |
+| HostPCProgram — 異常系対策 | 0 | 0 | 3 |
+| HostPCProgram — 管理画面 | 0 | 1 | 0 |
 | 作業指示Program（C0L-0163） | 3 | 0 | 1 |
 | DashboardProgram（C0L-0164） | 2 | 0 | 0 |
 | 画像検査DB連携 | 1 | 0 | 1 |
@@ -34,7 +34,7 @@
 
 ---
 
-## WorkInstructionApp（C0L-0160 / HostPC）
+## HostPCProgram（C0L-0160 / HostPC）
 
 ### API実装
 
@@ -89,7 +89,7 @@
 
 | タスク | 担当 | 進捗 | 開始 | 終了 | 備考 |
 |-------|------|:----:|------|------|------|
-| SignalR受信・更新トリガー実装 | 宮本 | 100% | 2026/5/25 | 2026/6/6 | WorkInstructionAppからの通知を受信してDBへ再クエリ |
+| SignalR受信・更新トリガー実装 | 宮本 | 100% | 2026/5/25 | 2026/6/6 | HostPCProgramからの通知を受信してDBへ再クエリ |
 | MySQL直接参照（SELECT）実装 | 宮本 | 100% | 2026/5/25 | 2026/6/6 | prod_process_execution_dbへ直接SQL（読み取り専用） |
 
 ---
