@@ -57,7 +57,7 @@ hasNext: false になるまで繰り返す
 |-----------|-----|------|------|
 | serialNo | string | ✓ | 製品シリアル番号 |
 
-### レスポンス（次ファイルあり）
+### レスポンス（次ファイルあり・通常工程）
 
 ```json
 {
@@ -66,9 +66,26 @@ hasNext: false になるまで繰り返す
   "stepOrder": 2,
   "fileName": "Y_jsonStr_RegistrationSTA2_raspi.json",
   "fileHash": "a3f9b2c1d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1",
-  "fileVersion": 1
+  "fileVersion": 1,
+  "isImageInspection": false
 }
 ```
+
+### レスポンス（次ファイルあり・画像検査工程）
+
+```json
+{
+  "hasNext": true,
+  "seqId": 5,
+  "stepOrder": 5,
+  "fileName": "Y_jsonStr_ImageInspectionSTA1_raspi.json",
+  "fileHash": "b4c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1",
+  "fileVersion": 1,
+  "isImageInspection": true
+}
+```
+
+`isImageInspection: true` を受け取った MiniPC は通常の TCP コマンド実行を行わず、**画像検査モード**に移行する。詳細は「[画像検査ハンドオフフロー](#画像検査ハンドオフフロー)」を参照。
 
 ### レスポンス（全ファイル完了）
 
@@ -152,6 +169,93 @@ Content-Type: `application/json`
 
 ---
 
+## 画像検査ハンドオフフロー
+
+`isImageInspection: true` を受け取った MiniPC は、HostPCProgram への工程ファイル問い合わせを一時停止し、画像検査PC（C0L-0162）と `image_inspection_db` を中心とした画像検査フローに移行する。
+
+### MiniPC の挙動
+
+```
+GET /ProcessFileApi/Next → isImageInspection: true を受信
+  │
+  ▼
+【画像検査モード突入】
+  │  HostPCProgram への /Next 問い合わせを停止
+  │  画像検査PC（C0L-0162）が image_inspection_db を更新するのを待つ
+  │
+  ▼
+image_inspection_db.Session の ALLResult をポーリング（~1秒間隔）
+  │  HostPCProgram も同時に Session をポーリングし、
+  │  Tablet_Interruptible を検知したら作業指示Program へ SignalR 通知する
+  │  （オペレーター確認が必要な場合のみ）
+  │
+  ├─ ALLResult = 'WAIT' → 継続監視
+  │
+  ├─ ALLResult = 'OK'  → 画像検査完了（正常）
+  │                         HostPCProgram へ /Next 問い合わせ再開
+  │
+  └─ ALLResult = 'NG'  → 画像検査完了（異常）
+                           エラー処理後 /Next または /Complete(NG) へ
+```
+
+### フロー図
+
+```mermaid
+sequenceDiagram
+    participant M  as MiniPC<br>(C0L-0161)
+    participant H  as HostPCProgram<br>(C0L-0160)
+    participant DB as image_inspection_db<br>(SQL Server)
+    participant I  as 画像検査PC<br>(C0L-0162)
+    participant T  as 作業指示Program<br>(C0L-0163)
+
+    Note over M,H: 通常工程ループ中
+
+    M->>H: GET /ProcessFileApi/Next?serialNo=SN123
+    H-->>M: { hasNext: true, isImageInspection: true, ... }
+
+    Note over M: 画像検査モードへ移行<br>/Next 問い合わせを一時停止
+
+    Note over I,DB: 画像検査PC が検査を開始<br>Session テーブルを更新
+
+    par MiniPC が ALLResult を監視
+        loop ポーリング（~1秒）
+            M->>DB: SELECT ALLResult FROM Session<br>WHERE SerialNo = 'SN123'
+            DB-->>M: ALLResult = 'WAIT'（検査中）
+        end
+    and HostPCProgram が Tablet_Interruptible を監視
+        loop ポーリング（~1秒）
+            H->>DB: SELECT * FROM Session<br>WHERE TabletExeStatus='NA'<br>AND OperatorMsg LIKE '%Tablet_Interruptible%'
+        end
+    end
+
+    Note over H: Tablet_Interruptible 検知（オペレーター確認が必要な場合）
+    H->>DB: UPDATE Session SET TabletExeStatus='WAIT'
+    H->>T: SignalR: 作業指示表示
+    T->>H: POST /ImageAnalysisJobsApi/TabletResult { result: 'OK' }
+    H->>DB: UPDATE Session SET TabletExeStatus='OK'
+
+    I->>DB: UPDATE Session SET ALLResult='OK', State='Next'
+
+    Note over M: ALLResult が 'OK' に変化
+
+    M->>H: GET /ProcessFileApi/Next?serialNo=SN123
+    Note over M,H: 通常工程ループ再開
+```
+
+### 画像検査中の責任分担
+
+| 役割 | 担当 |
+|------|------|
+| 画像検査の実行・Session 更新 | 画像検査PC（C0L-0162） |
+| `ALLResult` ポーリング（検査完了監視） | MiniPC（C0L-0161） |
+| `Tablet_Interruptible` ポーリング・SignalR 通知 | HostPCProgram（C0L-0160） |
+| オペレーター確認（OK/NG 入力） | 作業指示Program（C0L-0163）経由 |
+| `TabletExeStatus` 更新 | HostPCProgram（C0L-0160） |
+
+> **注意**: MiniPC は `Session.ALLResult` を監視するだけで、`Session` テーブルへの書き込みは行わない。`TabletExeStatus` の更新は HostPCProgram が担当する（[`10_image_inspection_api.md`](10_image_inspection_api.md) 参照）。
+
+---
+
 ## 関連テーブル
 
 | テーブル | 役割 |
@@ -160,3 +264,4 @@ Content-Type: `application/json`
 | `process_file_execution` | MiniPC の実行進捗（execution ごと）|
 | `process_execution` | MiniPC の工程実行トランザクション |
 | `process_master` | 工程マスタ |
+| `image_inspection_db.Session` | 画像検査フロー中の状態管理（画像検査モード時） |
