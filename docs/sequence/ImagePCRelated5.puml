@@ -1,0 +1,279 @@
+@startuml ImagePCRelated5_GC02V9
+title GC02V9 画像検査システム — 参加者間インタラクション\n（新GC02V9画像処理用.bat）
+
+skinparam sequence {
+  ParticipantBackgroundColor #E3F2FD
+  ParticipantBorderColor #1565C0
+  ActorBackgroundColor #FFF9C4
+  ActorBorderColor #F57F17
+  LifeLineBackgroundColor #F9FBE7
+  LifeLineBorderColor #1565C0
+  ArrowColor #1565C0
+}
+skinparam noteBackgroundColor #FFFDE7
+skinparam noteBorderColor #F9A825
+skinparam roundcorner 8
+
+actor "作業者A" as workerA
+actor "作業者B" as workerB
+participant "HostPC\n(GC02V9用)" as hostPC
+participant "I画像処理PC\n(GC02V9)\n新GC02V9画像処理用.bat" as imagePC
+participant "RasPi" as raspi
+participant "マシン" as machine
+participant "実機治具\nスキャナー" as scanner
+
+== 起動・初期化 ==
+
+workerB -> hostPC : C#STARTボタンを押して\n統括バッチファイルをクリック（一回のみ実行）
+note over hostPC
+  実行内容：
+  ・C:\inetpub\ftproot\Athenaの中身を削除
+  ・OngoingImageAdjust.txt（実行中判定用）を削除
+  ・新GC02V9画像処理用.bat 実行
+  ・Scan条件を治具スキャナーへ5秒ごとに送信
+end note
+
+workerA -> machine : RasPiをマシンへ挿入
+
+hostPC -> imagePC : 新GC02V9画像処理用.bat 起動指示
+imagePC -> imagePC : バッチ実行 開始
+
+== GC02V9画像検査シーケンス（工程情報より順次ループ） ==
+
+loop 各工程（例：A3機 色ずれ調整）[工程情報よりシーケンス実施]
+
+  hostPC -> raspi : 接続（来たよ）
+  raspi -> machine : 電源ON 確認
+  machine --> raspi : 電源ON 応答
+
+  raspi <-> machine : マシン情報 交換\n（SN, Kishu, Life, TopLeft, CmdLine）
+  raspi --> hostPC : マシン情報 返信
+
+  hostPC -> hostPC : プリスクライブファイル加工\n（SN, Kishu, Life, TopLeft, CmdLine 取得）
+  note right of hostPC
+    SQL Insert（ImageAdj用テーブル）:
+    ・SN条件でSelect
+    ・なければ新規行挿入（残りretry=3等）
+    ・あればその行へ情報を挿入
+  end note
+
+  hostPC -> raspi : プリスクライブファイルを送信
+  raspi -> machine : プリスクライブファイルを転送
+
+  machine -> machine : GC02V9 画像検査実施\n（例：A3機 色ずれ調整）
+
+  machine --> raspi : 紙出力終了
+  raspi --> hostPC : 印字終了を知らせ
+
+  hostPC --> imagePC : 印字終了通知
+
+  ' --- スキャン作業 ---
+  workerA -> scanner : スキャン作業\n（紙設置後 Send+Start を押す）
+  scanner -> imagePC : 画像.jpg を FTP 送信\n(C:\inetpub\ftproot\Athena\画像.jpg)
+
+  imagePC -> imagePC : BarcodeRead.exe 実行\n（バーコード情報取得）
+  note right of imagePC
+    C:\inetpub\ftproot\画像.jpg
+    ⇒ C:\inetpub\ftproot\Athena\画像.jpg へ移動
+    ・A4Y と A3 の場所 2か所を解析
+    ・3段のバーコード読み取り
+  end note
+
+  imagePC --> hostPC : バーコード情報より SQL Select 要求\n（Machine_Info, CmdLine_Info）
+  hostPC --> imagePC : SQL 結果（CmdLine、SN等）
+
+  alt 情報取得成功（レコードが一つだけ存在する場合）
+    imagePC -> imagePC : 旧 imageSITC2.exe グループ終了待ち\n（OngoingImageSITC2.txt が存在？Loop へ）
+    imagePC -> imagePC : OngoingImageAdjust.txt 作成（実行中判定用）
+    imagePC -> imagePC : 本番の ImageAdj.exe 実行\n（CmdLine情報より）
+    imagePC -> imagePC : 最新画像.jpg 解析\n(C:\inetpub\ftproot\Athena\画像.jpg)
+    note right of imagePC: 色ずれの場合、より厳しい管理値を使用\n（OK判定列で定義）
+    imagePC -> imagePC : 結果処理\n（検査項目の判定 + OngoingImageAdjust.txt 削除）
+
+    alt 結果 = Adjust（調整が必要）
+      imagePC -> imagePC : Adjust 調整コマンドファイル作成
+    else 結果 = OK / NG / ERR
+      imagePC -> imagePC : 実行ファイル終了
+    end
+
+    imagePC -> imagePC : MESのMOM用結果ファイル作成\n（HostPC共有フォルダへ保存）
+    imagePC --> hostPC : WebAPI 送信\n（①OK/NG/ERR ②Adjust調整コマンド ③MOM用）
+
+  else 情報取得失敗（望まない結果 / ERROR）
+    imagePC --> hostPC : WebAPI 送信（ERROR）
+  end
+
+  ' --- HostPC 結果処理 ---
+  hostPC -> hostPC : 結果受け取り（OK / NG / ERR / Adj）
+  hostPC -> hostPC : SNと残りretryをゲット\n⇒ SQLデータ（行）削除
+  note right of hostPC
+    NG/ERR の場合：
+    ・残りretry > 0 → SNとn-1の新規行挿入（リトライ）
+    ・残りretry ≦ 0 → LINEOUT処理へ
+    削除前に INSERT To 履歴テーブル
+  end note
+
+  alt 結果 = Adjust
+    hostPC -> raspi : 調整CMDをマシンへ送信
+    raspi -> machine : 調整実施
+    hostPC -> hostPC : CmdLineにて Rangeファイルを変更\n（色ずれの場合、本来のものをOK判定列で定義）
+    note right of hostPC: Adjustの場合も残りRetryN設ける方向へ
+  else 結果 = OK
+    hostPC -> hostPC : 次の工程へ
+  else 結果 = NG/ERR（残りretry > 0）
+    hostPC -> hostPC : リトライ（ループ）
+  else 結果 = NG/ERR（残りretry ≦ 0）
+    hostPC -> hostPC : LINEOUT処理へ
+  end
+
+end
+
+== 検査終了 ==
+
+workerB -> hostPC : C#統括画面でSTOP後、×ボタンで閉じる（全終了）
+workerB -> imagePC : STOPボタンを押す（バッチ終了）
+
+@enduml
+
+@startuml ImagePCRelated5_SITC2
+title SITC2 画像検査システム — 参加者間インタラクション\n（旧SITC2画像処理用.bat）
+
+skinparam sequence {
+  ParticipantBackgroundColor #E8F5E9
+  ParticipantBorderColor #2E7D32
+  ActorBackgroundColor #FFF9C4
+  ActorBorderColor #F57F17
+  LifeLineBackgroundColor #F9FBE7
+  LifeLineBorderColor #2E7D32
+  ArrowColor #2E7D32
+}
+skinparam noteBackgroundColor #FFFDE7
+skinparam noteBorderColor #F9A825
+skinparam roundcorner 8
+
+actor "作業者A" as workerA2
+actor "作業者B" as workerB2
+participant "HostPC\n(SITC2用)" as hostPC2
+participant "I画像処理PC\n(SITC2)\n旧SITC2画像処理用.bat" as imagePC2
+participant "RasPi" as raspi2
+participant "マシン\n(スキャナー)" as machine2
+participant "Tablet" as tablet2
+
+== 起動・初期化 ==
+
+workerB2 -> hostPC2 : C#STARTボタンを押して\n統括バッチファイルをクリック（一回のみ実行）
+note over hostPC2
+  実行内容：
+  ・C:\inetpub\ftproot\AthenaSITC2の中身を削除
+  ・OngoingImageSITC2.txt（実行中判定用）を削除
+  ・旧SITC2画像処理用.bat 実行
+  ・Scan条件を治具スキャナーへ5秒ごとに送信
+end note
+
+workerA2 -> machine2 : RasPiをマシンへ挿入
+
+hostPC2 -> imagePC2 : 旧SITC2画像処理用.bat 起動指示
+imagePC2 -> imagePC2 : バッチ実行 開始
+
+== SITC2 画像検査シーケンス（工程情報より順次ループ） ==
+
+loop 各工程（例：LOW機 ISU検査）[工程情報よりシーケンス実施]
+
+  hostPC2 -> raspi2 : 接続（来たよ）
+  raspi2 -> machine2 : 電源ON 確認
+  machine2 --> raspi2 : 電源ON 応答
+
+  raspi2 <-> machine2 : マシン情報 交換
+  raspi2 --> hostPC2 : マシン情報 返信
+
+  ' --- スキャン指示 ---
+  hostPC2 -> raspi2 : SITC2原稿紙スキャン指示\n（SN, Kishu, Life 等）
+  raspi2 -> tablet2 : SITC2原稿紙を設置後\nSCANボタンを押すよう指示
+  tablet2 --> workerA2 : スキャン指示待ち
+
+  workerA2 -> machine2 : SITC2原稿設置
+  workerA2 -> tablet2 : SCANボタンを押す
+  tablet2 -> raspi2 : SCAN指示
+  raspi2 -> machine2 : スキャン条件＋Send＋StartCmd 送信
+  machine2 -> machine2 : スキャン実行（紙出力終了待ち）
+  machine2 --> raspi2 : スキャン完了・画像.jpg FTP 送信
+  raspi2 -> imagePC2 : スキャン条件＋紙出力終了通知
+
+  ' --- SITC2 I画像処理PC 処理 ---
+  imagePC2 -> hostPC2 : SQL Select 要求\n（Machine_Info, CmdLine_Info）
+  note right of imagePC2
+    決まった条件でSITC2用の行をフィルター、
+    Top1行を取得（または別のSQLテーブル）
+  end note
+  hostPC2 --> imagePC2 : SQL 結果
+
+  imagePC2 -> imagePC2 : WEB API でマシン情報より\n画像ファイルを問い合わせ待ち\n（SITC2_SN_機種_LifeCount_DEFAULT.jpg）
+  note right of imagePC2
+    C:\inetpub\ftproot\ImageSITC2\画像.jpg へ保存
+    （SITC2専用場所）
+  end note
+
+  imagePC2 -> imagePC2 : BarcodeRead.exe ⇒ 原稿管理Noを取得
+  imagePC2 -> imagePC2 : PC内に原稿管理Noを探す
+
+  alt 原稿管理No が見つかった場合
+    imagePC2 -> imagePC2 : SITC2masterLength%kanriNo%.csv\n⇒ SITC2masterLengthSelect.csv へコピー
+    note right of imagePC2: SITC2masterLength%kanriNo%.csvの場所はHostPCへ変更\n（HostPCの共有フォルダに置く）
+    imagePC2 -> imagePC2 : ImageAdj.exe 実行グループが終わるまで待ち\n（OngoingImageAdjust.txtが存在？Loopへ）
+    imagePC2 -> imagePC2 : OngoingImageSITC2.txt 作成（実行中判定用）
+    imagePC2 -> imagePC2 : imageSITC2.exe 実行（改造版）
+    imagePC2 -> imagePC2 : 画像.jpg を解析\n(C:\inetpub\ftproot\AthenaSITC2\画像.jpg)
+    note right of imagePC2
+      ImageAdjustのFTP受信フォルダー名を変更
+      （バッティングリスク回避のため）
+      ExitCode＝0(OK)、11(NG)、その他(ERR)
+    end note
+    imagePC2 -> imagePC2 : 結果処理\n（検査項目の判定 + OngoingImageSITC2.txt 削除）
+
+    alt 結果 = OK / NG / ERR
+      imagePC2 -> imagePC2 : 実行ファイル終了
+    end
+
+    imagePC2 -> imagePC2 : MESのMOM用結果ファイル作成\n（HostPC共有フォルダへ保存）
+    imagePC2 --> hostPC2 : WebAPI 送信\n（Exitcodeより OK/NG/ERR ＋ MOM用）
+
+  else 原稿管理No が見つからない場合
+    imagePC2 --> hostPC2 : WebAPI 送信\n（Exitcodeより OK/NG/ERR ＋ MOM用）
+  end
+
+  ' --- HostPC 結果処理 ---
+  hostPC2 -> hostPC2 : 結果受け取り（OK / NG / ERR）
+  hostPC2 -> hostPC2 : SNと残りretryをゲット\n⇒ SQLデータ（行）削除
+  note right of hostPC2
+    NG/ERR の場合：
+    ・残りretry > 0 → SNとn-1の新規行挿入（リトライ）
+    ・残りretry ≦ 0 → LINEOUT処理へ
+    削除前に INSERT To 履歴テーブル
+  end note
+
+  alt 結果 = OK
+    hostPC2 -> hostPC2 : 次の工程へ
+    note right: 画像.jpg を\nRename → SN_機種_LifeCount_Cas1.jpg として保管
+  else 結果 = NG/ERR（残りretry > 0）
+    hostPC2 -> hostPC2 : リトライ（ループ）
+  else 結果 = NG/ERR（残りretry ≦ 0）
+    hostPC2 -> hostPC2 : LINEOUT処理へ
+  end
+
+end
+
+== 検査終了 ==
+
+workerB2 -> hostPC2 : C#統括画面でSTOP後、×ボタンで閉じる（全終了）
+workerB2 -> imagePC2 : STOPボタンを押す（バッチ終了）
+
+note over workerB2, imagePC2
+  作業者B によるNGまたはERR確認手順（NGかERRのみ）：
+  どの項目がNGなのか確認後、クリックして次へ
+  （注意：クリックをなくす方向を検討中）
+  ・ERRかNGのとき、もう一回か3回（例）実施させる → 後 LINEOUT へ
+  ・性能的なNG → 簡易的な文字列を Host⇒Tablet
+  ポップアップが絶対ないようなエラー処理が可能か → 可能
+end note
+
+@enduml
