@@ -1,0 +1,305 @@
+@startuml 全体の流れ
+!theme plain
+title 画像検査 全体の流れ（GC02V9 対応フロー）
+
+skinparam backgroundColor #FEFEFE
+skinparam defaultTextAlignment center
+skinparam note {
+  BackgroundColor #FFFDE7
+  BorderColor #F9A825
+}
+skinparam activity {
+  BackgroundColor #E3F2FD
+  BorderColor #1565C0
+  ArrowColor #1565C0
+  StartColor #1565C0
+  EndColor #880E4F
+}
+skinparam groupBackgroundColor #F3E5F5
+skinparam groupBorderColor #7B1FA2
+
+note
+  フロー説明：
+  ・作業者の目線で見た流れ
+  ・マシン・作業者・治具スキャナー・画像処理PC・HostPC は
+    それぞれ独立して処理し、「待ち合わせ」方式で連携する
+  ・データ活用：QLIKSENSE用SQLサーバでなく MES(MOM) へ
+  ・各調整ステップで NG/ERR の場合はリトライ（例：3回）
+end note
+
+start
+
+' ===== U950前の画像診断データ取り =====
+group U950前の画像診断データ取り
+  :画像診断チャート印字指示;
+  :画像診断チャート出力（1枚）;
+  :チャートセット;
+  :Send＋Startボタンを押す ⇒ 画像解析;
+  :結果受信;
+end group
+
+' ===== U950前のハーフ画像データ取り =====
+group U950前のハーフ画像データ取り
+  :ハーフ画像 BK（1枚）;
+  :チャートセット;
+  :Send＋Start ⇒ 画像解析;
+  :結果受信;
+  note right: NG判定 ⇒ 3回などリトライ
+
+  :ハーフ画像 Cyan（1枚）;
+  :チャートセット;
+  :Send＋Start ⇒ 画像解析;
+  :結果受信;
+  note right: NG判定 ⇒ 3回などリトライ
+
+  :ハーフ画像 Magenta（1枚）;
+  :チャートセット;
+  :Send＋Start ⇒ 画像解析;
+  :結果受信;
+  note right: NG判定 ⇒ 3回などリトライ
+
+  :ハーフ画像 Yellow（1枚）;
+  :チャートセット;
+  :Send＋Start ⇒ 画像解析;
+  :結果受信;
+  note right: NG判定 ⇒ 3回などリトライ
+end group
+
+' ===== U950 =====
+group U950
+  :U950 処理;
+end group
+
+' ===== SITC2 検査 =====
+group SITC2検査
+  repeat
+    :SITC2検査スキャン指示;
+    :（タブレットからの指示受け）\n原稿セット後、自動スキャン（検討中）;
+    note right: 手動の場合、製品の Send＋Start を押す
+    :SITC2画像転送（1枚）;
+    :画像受信;
+    :画像解析;
+    note right
+      課題：解析後のポップアップや
+      エラーポップアップの非表示、
+      戻り値の受け方 ⇒ 可不可検討が必要
+    end note
+    :結果受信;
+    if (ERR/NG/Adjust/調整不可(>n)?) then (yes)
+      :LINEOUT;
+      stop
+    elseif (Adjust?) then (yes)
+      :手動調整;
+    else (ERR,NG)
+    endif
+  backward :再試行;
+  repeat while (OK?) is (no)
+  ->OK;
+end group
+
+' ===== LSUSkew 調整 =====
+group LSUSkew調整
+  repeat
+    :LSUSkew印字指示;
+    :LSUSkewチャート出力（1枚）;
+    :チャートセット;
+    :Send＋Startボタン ⇒ 画像解析;
+    :結果受信;
+    if (ERR/NG/Adjust/調整不可(>n)?) then (yes)
+      :LINEOUT;
+      stop
+    elseif (Adjust?) then (yes)
+      :調整コマンド送信;
+    else (ERR,NG)
+    endif
+  backward :再試行;
+  repeat while (OK?) is (no)
+  ->OK;
+end group
+
+' ===== CAS1タイミング・色ずれ調整 =====
+group CAS1タイミング・色ずれ調整
+  repeat
+    :CAS1タイミング・色ずれ調整印字指示;
+    :CAS1タイミング・色ずれチャート出力（1枚）;
+    :チャートセット;
+    :Send＋Startボタン ⇒ 画像解析;
+    :結果受信;
+    if (ERR/NG/Adjust/調整不可(>n)?) then (yes)
+      :LINEOUT;
+      stop
+    elseif (Adjust?) then (yes)
+      :調整コマンド送信;
+    else (ERR,NG)
+    endif
+  backward :再試行;
+  repeat while (OK?) is (no)
+  ->OK;
+end group
+
+' ===== CAS2タイミング調整 =====
+group CAS2タイミング調整
+  repeat
+    :CAS2タイミング調整印字指示;
+    :CAS2タイミングチャート出力（1枚）;
+    :チャートセット;
+    :Send＋Startボタン ⇒ 画像解析;
+    :結果受信;
+    if (ERR/NG/Adjust/調整不可(>n)?) then (yes)
+      :LINEOUT;
+      stop
+    elseif (Adjust?) then (yes)
+      :調整コマンド送信;
+    else (ERR,NG)
+    endif
+  backward :再試行;
+  repeat while (OK?) is (no)
+  ->OK;
+end group
+
+' ===== MPTタイミング調整 =====
+group MPTタイミング調整
+  repeat
+    :MPTタイミング調整印字指示;
+    :MPTタイミングチャート出力（1枚）;
+    :チャートセット;
+    :Send＋Startボタン ⇒ 画像解析;
+    :結果受信;
+    if (ERR/NG/Adjust/調整不可(>n)?) then (yes)
+      :LINEOUT;
+      stop
+    elseif (Adjust?) then (yes)
+      :調整コマンド送信;
+    else (ERR,NG)
+    endif
+  backward :再試行;
+  repeat while (OK?) is (no)
+  ->OK;
+end group
+
+' ===== Deck3タイミング調整 =====
+group Deck3タイミング調整
+  repeat
+    :Deck3タイミング調整印字指示;
+    :Deck3タイミングチャート出力（1枚）;
+    :チャートセット;
+    :Send＋Startボタン ⇒ 画像解析;
+    :結果受信;
+    if (ERR/NG/Adjust/調整不可(>n)?) then (yes)
+      :LINEOUT;
+      stop
+    elseif (Adjust?) then (yes)
+      :調整コマンド送信;
+    else (ERR,NG)
+    endif
+  backward :再試行;
+  repeat while (OK?) is (no)
+  ->OK;
+end group
+
+' ===== Deck4タイミング調整 =====
+group Deck4タイミング調整
+  repeat
+    :Deck4タイミング調整印字指示;
+    :Deck4タイミングチャート出力（1枚）;
+    :チャートセット;
+    :Send＋Startボタン ⇒ 画像解析;
+    :結果受信;
+    if (ERR/NG/Adjust/調整不可(>n)?) then (yes)
+      :LINEOUT;
+      stop
+    elseif (Adjust?) then (yes)
+      :調整コマンド送信;
+    else (ERR,NG)
+    endif
+  backward :再試行;
+  repeat while (OK?) is (no)
+  ->OK;
+end group
+
+' ===== Duplexタイミング調整 =====
+group Duplexタイミング調整
+  repeat
+    :Duplexタイミング調整印字指示;
+    :Duplexタイミングチャート出力（1枚）;
+    :チャートセット;
+    :Send＋Startボタン ⇒ 画像解析;
+    :結果受信;
+    if (ERR/NG/Adjust/調整不可(>n)?) then (yes)
+      :LINEOUT;
+      stop
+    elseif (Adjust?) then (yes)
+      :調整コマンド送信;
+    else (ERR,NG)
+    endif
+  backward :再試行;
+  repeat while (OK?) is (no)
+  ->OK;
+end group
+
+' ===== COPY検査 =====
+group COPY検査
+  repeat
+    :COPY検査印字指示;
+    :COPY検査用チャート出力（1枚）;
+    :（タブレットからの指示受け）\nチャートセット後、自動スキャン（検討中）;
+    note right: 手動の場合、製品の Send＋Start を押す
+    :COPY検査画像送信;
+    :画像受信;
+    :画像解析;
+    :結果受信;
+    if (ERR/NG/調整不可(>n)?) then (yes)
+      :LINEOUT;
+      stop
+    else (ERR,NG)
+    endif
+  backward :再試行;
+  repeat while (OK?) is (no)
+  ->OK;
+end group
+
+' ===== 出荷前の画像診断データ取り =====
+group 出荷前の画像診断データ取り
+  :画像診断チャート印字指示;
+  :画像診断チャート出力（1枚）;
+  :チャートセット;
+  note right
+    紙を集めておいて後でまとめてスキャン・解析する案も考えられる。
+    スキャン失敗時、NG画像の判定が未検討
+    （とれる分だけをとらせる？相談が必要）
+  end note
+  :Send＋Startボタン ⇒ 画像解析;
+  :結果受信;
+  note right: OKでない ⇒ 3回等、リトライ
+end group
+
+' ===== 出荷前のハーフ画像データ取り =====
+group 出荷前のハーフ画像データ取り
+  :ハーフ画像 BK（1枚）;
+  :チャートセット;
+  :Send＋Start ⇒ 画像解析;
+  :結果受信;
+  note right: NG判定 ⇒ 3回などリトライ
+
+  :ハーフ画像 Cyan（1枚）;
+  :チャートセット;
+  :Send＋Start ⇒ 画像解析;
+  :結果受信;
+  note right: NG判定 ⇒ 3回などリトライ
+
+  :ハーフ画像 Magenta（1枚）;
+  :チャートセット;
+  :Send＋Start ⇒ 画像解析;
+  :結果受信;
+  note right: NG判定 ⇒ 3回などリトライ
+
+  :ハーフ画像 Yellow（1枚）;
+  :チャートセット;
+  :Send＋Start ⇒ 画像解析;
+  :結果受信;
+  note right: NG判定 ⇒ 3回などリトライ
+end group
+
+stop
+
+@enduml

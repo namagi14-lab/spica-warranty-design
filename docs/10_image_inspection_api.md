@@ -8,6 +8,61 @@
 
 ## 1. 全体フロー
 
+### 1.1 Spica 画像検査 全体シーケンス（概念図）
+
+> 製品は最大4台並列で動作する。この図では1台分で代表表示。
+
+```mermaid
+sequenceDiagram
+    box 製品側（最大4台並列）
+        participant Product as 製品<br>（内蔵スキャナー）
+    end
+    participant FTP as FTPフォルダ<br>C:\inetpub\ftproot
+    participant MiniPC as MiniPC<br>（サーバー）
+    participant HostPC as HostPC<br>(HostPCProgram)
+    participant DB as 画像処理DB<br>(image_inspection_db)
+    participant ImgPC as 画像検査PC<br>(C0L-0162)
+    participant Tablet as Tablet<br>（作業指示Program）
+
+    == 1. スキャン画像を送る ==
+
+    Product->>FTP: スキャン画像を FTP 経由で送付
+    FTP->>MiniPC: 新しい画像ファイルを検知
+    Note right of MiniPC: 重複防止のため<br>ファイル名に固有シリアルを付与して保存
+    MiniPC->>MiniPC: 自分の担当画像であればファイル名を変更<br>（シリアル＋日付＋PC名＋工程名）
+
+    == 2. HostPC へ送付 ==
+
+    MiniPC->>HostPC: WebAPI でアップロード（解析指示）
+    HostPC->>HostPC: 解析画像をローカルフォルダに保存
+    HostPC->>DB: 処理待ち JOB を登録
+    MiniPC->>HostPC: 解析結果問い合わせ（Loop）
+
+    == 3. 画像検査PC が解析 ==
+
+    ImgPC->>DB: 処理待ち JOB を確認
+    ImgPC->>HostPC: 解析対象画像を取得
+    ImgPC->>ImgPC: 画像解析を実施
+    ImgPC->>DB: 解析結果を登録<br>（OK / NG、NG項目）
+
+    == 4. MiniPC が結果確認 ==
+
+    MiniPC->>HostPC: 解析結果問い合わせ（Loop）
+    HostPC->>DB: 結果を確認
+    DB-->>HostPC: 結果を通知
+    HostPC-->>MiniPC: 結果を通知
+
+    alt 結果が OK
+        MiniPC->>Product: 次の工程へ進める
+    else 結果が NG
+        MiniPC->>Tablet: NG メッセージを表示
+    end
+```
+
+### 1.2 Tablet_Interruptible 連携フロー（詳細）
+
+画像検査中にオペレーター確認が必要な場合（`OperatorMsg` に `"Tablet_Interruptible"` が含まれるとき）の連携。
+
 ```
 画像検査Program     image_inspection_db     HostPCProgram     作業指示Program
   (C0L-0162)        (SQL Server)              (C0L-0160)            (C0L-0163)
