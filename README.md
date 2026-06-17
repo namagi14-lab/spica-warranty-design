@@ -87,7 +87,7 @@ graph TB
    ※ MiniPC によるポーリングは不要
 
 ⑤ 工程完了
-   MiniPC が /MachineApi/Complete → OK / NG / ABORT
+   MiniPC が /MachineApi/Complete → OK / NG
    → NG の場合はラインアウト → 修正後に再投入
 ```
 
@@ -134,7 +134,7 @@ graph TB
 | `POST /StepApi/UpdateStep` | Step 開始通知（MANUAL Step の確認トリガー） |
 | `POST /StepApi/RecordStep` | Step 完了を記録 |
 | `POST /MachineApi/Complete` | 工程完了（OK/NG） |
-| `POST /MachineApi/Exit` | 異常退室・ABORT |
+| `POST /MachineApi/Exit` | 異常退室 |
 
 ### HostPCProgram → MiniPC（コールバック・プッシュ型）
 
