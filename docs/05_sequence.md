@@ -197,7 +197,7 @@ sequenceDiagram
 
   alt RUNNING が存在する（正常）
     H-->>M: {success:true, hasInstruction, zoneId}
-  else RUNNING が存在しない（ABORTされた）
+  else RUNNING が存在しない（NGに変更済み）
     H-->>M: {success:false, message: "実行中トランザクションが見つかりません"}
     Note over M: 再度 /Enter から開始
   end

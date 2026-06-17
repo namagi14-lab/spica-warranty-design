@@ -166,14 +166,13 @@
 | CurrentStepKey | INT | | YES | NULL | 現在到達しているStepKey |
 | StartTime | DATETIME | | NO | | 工程開始時刻 |
 | EndTime | DATETIME | | YES | NULL | 工程終了時刻 |
-| Status | ENUM('RUNNING','OK','NG','ABORT') | IDX | NO | 'RUNNING' | 工程状態 |
+| Status | ENUM('RUNNING','OK','NG') | IDX | NO | 'RUNNING' | 工程状態 |
 
 ### Statusの遷移
 
 ```
 RUNNING → OK      正常完了
 RUNNING → NG      異常完了（再作業が必要）
-RUNNING → ABORT   中断（マシン退室・異常終了）
 ```
 
 ### 再作業の追跡

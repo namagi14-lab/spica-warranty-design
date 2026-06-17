@@ -151,7 +151,7 @@ sequenceDiagram
     App->>DB: process_definition から最新 ProcessDefId を取得
 
     alt 同シリアルで RUNNING が存在する場合（二重入室防止）
-        App->>DB: 既存 process_execution.Status = ABORT
+        App->>DB: 既存 process_execution.Status = NG
         App->>DB: 残 work_instruction_execution.Status = SKIPPED
         App->>DB: 残 process_file_execution.Status = SKIPPED
     end
@@ -288,9 +288,9 @@ sequenceDiagram
 
     else 異常退室・緊急停止
         MiniPC->>App: POST /MachineApi/Exit { serialNo }
-        App->>DB: process_execution.Status = ABORT / EndTime = NOW()
+        App->>DB: process_execution.Status = NG / EndTime = NOW()
         App->>DB: 残 work_instruction_execution / process_file_execution = SKIPPED
-        App-)Dash: SignalR: 更新通知（ABORT）
+        App-)Dash: SignalR: 更新通知（異常退室）
         Dash->>DB: SELECT（直接SQL参照）
     end
 
@@ -520,7 +520,7 @@ HostPCProgram が使用する主なカラム:
 | `POST /StepApi/UpdateStep` | Step 開始通知（MANUAL Step の確認トリガー） |
 | `POST /StepApi/RecordStep` | Step 完了を記録 |
 | `POST /MachineApi/Complete` | 工程完了（OK/NG） |
-| `POST /MachineApi/Exit` | 異常退室・ABORT |
+| `POST /MachineApi/Exit` | 異常退室 |
 
 ### HostPCProgram → MiniPC（コールバック・プッシュ型）
 

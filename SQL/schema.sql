@@ -114,7 +114,7 @@ CREATE TABLE IF NOT EXISTS process_execution (
   CurrentStepKey      INT              COMMENT '現在到達しているStepKey',
   StartTime           DATETIME NOT NULL,
   EndTime             DATETIME,
-  Status              ENUM('RUNNING','OK','NG','ABORT') NOT NULL DEFAULT 'RUNNING',
+  Status              ENUM('RUNNING','OK','NG') NOT NULL DEFAULT 'RUNNING',
   PRIMARY KEY (ExecutionId),
   KEY idx_serial  (MachineSerialNo),
   KEY idx_zone_status (ZoneId, Status),
