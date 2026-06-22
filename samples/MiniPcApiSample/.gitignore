@@ -1,0 +1,13 @@
+# Build output
+[Bb]in/
+[Oo]bj/
+*.user
+
+# Visual Studio
+.vs/
+
+# Restored packages
+packages/
+
+# 実行時に生成される工程JSONの保存先
+process_files/
