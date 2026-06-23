@@ -1,5 +1,8 @@
 # 05 シーケンス図
 
+> ⚠️ 本書は旧アーキテクチャ（HostPCProgram / `prod_process_execution_db` 中心）のシーケンスです。
+> 現行方針では MiniPC は **HostPcアプリ（CarrotRape）** 経由で連携し DB へ直接アクセスしません。最新方針: **[12_host_pc_app_pivot.md](12_host_pc_app_pivot.md)**。
+
 ---
 
 ## 1. 工程実行の全体フロー（正常系）
@@ -121,13 +124,13 @@ sequenceDiagram
 ## 4. 画像検査工程ハンドオフ
 
 通常工程は MiniPC → HostPCProgram の `/ProcessFileApi/Next` 問い合わせで進むが、  
-**画像検査工程に入ると MiniPC は HostPCProgram への問い合わせを一時停止し、`image_inspection_db` を直接監視する。**
+**画像検査工程に入ると MiniPC は HostPCProgram への問い合わせを一時停止し、`host_pc_db` を直接監視する。**
 
 ```mermaid
 sequenceDiagram
     participant M  as MiniPC<br>(C0L-0161)
     participant H  as HostPCProgram<br>(C0L-0160)
-    participant DB as image_inspection_db<br>(SQL Server)
+    participant DB as host_pc_db<br>(SQL Server)
     participant I  as 画像検査PC<br>(C0L-0162)
     participant T  as 作業指示Program<br>(C0L-0163)
     actor Op as オペレーター

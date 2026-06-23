@@ -392,8 +392,8 @@ GC02V9/SITC2 の現行フローと Spica 新アーキテクチャ（[`10_image_i
 | RasPi | MiniPC（C0L-0161） |
 | HostPC（バッチ統括） | HostPCProgram（C0L-0160） |
 | 画像処理PC（バッチ） | 画像検査Program（C0L-0162）※変更しない方針 |
-| SQL Server（ImageAdj用テーブル） | `image_inspection_db`（暫定構成）|
-| 治具スキャナー FTP → Athena\ | 製品内蔵スキャナー FTP → `image_inspection_db` 経由 |
+| SQL Server（ImageAdj用テーブル） | `host_pc_db`（暫定構成）|
+| 治具スキャナー FTP → Athena\ | 製品内蔵スキャナー FTP → `host_pc_db` 経由 |
 | WebAPI（HostPC → 画像処理PC） | WebAPI（HostPCProgram ↔ 画像検査Program） |
 | 調整コマンド（RasPi → マシン） | MiniPC → マシン（TCP コマンド） |
 | ポップアップ制御（未解決） | `Tablet_Interruptible` + SignalR 方式で解決 |
@@ -408,6 +408,6 @@ GC02V9/SITC2 の現行フローと Spica 新アーキテクチャ（[`10_image_i
 ## 8. 関連ドキュメント
 
 - [`08_image_inspection.md`](08_image_inspection.md) — 旧機種 RasPi プログラム調査結果
-- [`08_image_inspection_db.md`](08_image_inspection_db.md) — `image_inspection_db` スキーマ（暫定構成）
+- [`08_image_inspection_db.md`](08_image_inspection_db.md) — `host_pc_db` スキーマ（暫定構成）
 - [`10_image_inspection_api.md`](10_image_inspection_api.md) — Spica 向け HostPCProgram API 設計
 - [`docs/sequence/`](sequence/) — PlantUML ソースファイル

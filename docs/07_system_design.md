@@ -1,7 +1,12 @@
 # Spica 保証工程 システム設計書
 
-- **DB**: `prod_process_execution_db`（MySQL）
-- **アプリ**: HostPCProgram（ASP.NET MVC 5 / IIS）
+> ⚠️ **本書は旧アーキテクチャ（HostPCProgram → `prod_process_execution_db` 中心）のシーケンス設計です。**
+> 現行方針では MiniPC は **HostPcアプリ（CarrotRape）** の WebAPI を呼び、中心DBは **`host_pc_db`** です。
+> 本書の各シーケンス内 `HostPCProgram`／`MySQL` は、新構成では `HostPcアプリ`／`host_pc_db` に読み替えてください
+> （`prod_process_execution_db` はダッシュボード表示用に残置・ミラー書き込み）。最新方針: **[12_host_pc_app_pivot.md](12_host_pc_app_pivot.md)**。
+
+- **DB**: `prod_process_execution_db`（MySQL）※新構成では中心DBは `host_pc_db`（SQL Server）
+- **アプリ**: HostPCProgram（ASP.NET MVC 5 / IIS）※新構成では HostPcアプリ（CarrotRape / ASP.NET Core）
 
 ---
 
@@ -13,7 +18,7 @@
 | MiniPC（ライン内） | 各ゾーンに設置。**保証工程制御Program（C0L-0161）**が動作。製品マシンを制御し、HostPCProgram と通信する。**HTTP サーバーも兼ねる（コールバック受信）** |
 | HostPCProgram（HostPC） | **C0L-0160**。工程トランザクションを管理する Web アプリ（ASP.NET MVC 5）。MiniPC API・タブレット向け SignalR・DashboardProgram 向け通知を担う |
 | タブレット（ライン内） | **作業指示Program（C0L-0163）**が動作。オペレーターが作業内容を確認し OK/NG を入力する |
-| 画像検査PC（ライン内） | **画像検査Program（C0L-0162）**が動作。実機スキャナで画像検査を行い、`image_inspection_db` へ直接書き込む（暫定構成） |
+| 画像検査PC（ライン内） | **画像検査Program（C0L-0162）**が動作。実機スキャナで画像検査を行い、`host_pc_db` へ直接書き込む（暫定構成） |
 | DashboardProgram（HostPC） | **C0L-0164**。HostPC 上で動作。SignalR で更新通知を受け取り、データは MySQL へ直接 SQL（SELECT のみ）で取得する。**表示はライン外のダッシュボード表示専用デバイスのブラウザで行う** |
 | ダッシュボード表示デバイス（ライン外） | ブラウザで DashboardProgram にアクセスし、工程の進捗をモニター表示する専用デバイス |
 | オペレーター | 作業者。タブレットで作業指示を確認し OK / NG を入力する |
@@ -392,7 +397,7 @@ erDiagram
 ## 9. 画像検査工程フロー（暫定構成：専用DB経由）
 
 > **この構成は暫定対応です。** 画像検査Program（C0L-0162）が現行のAPI連携に対応できないため、  
-> `image_inspection_db`（HostPC上の専用DB）を仲介する構成を採用しています。  
+> `host_pc_db`（HostPC上の専用DB）を仲介する構成を採用しています。  
 > 将来的には通常の MiniPC → HostPCProgram API 構成に統一する予定です。
 
 ### 9-1. 画像検査での自動ステップ（作業指示なし）
@@ -400,7 +405,7 @@ erDiagram
 ```mermaid
 sequenceDiagram
     participant IMG as 画像検査Program（C0L-0162）
-    participant IDB as image_inspection_db（画像検査専用DB）
+    participant IDB as host_pc_db（画像検査専用DB）
 
     IMG->>IDB: INSERT image_analysis_sessions（RUNNING）
     IMG->>IMG: スキャン実行・画像解析
@@ -411,15 +416,15 @@ sequenceDiagram
 
 ### 9-2. 画像検査での手動ステップ（作業指示あり）
 
-作業指示が必要なステップでは、画像検査Program が `image_inspection_db` に作業指示レコードを書き込む。  
+作業指示が必要なステップでは、画像検査Program が `host_pc_db` に作業指示レコードを書き込む。  
 HostPCProgram の作業指示Program（タブレットタブ）が DB をポーリングして検知し、タブレットに表示する。  
-オペレーターが OK/NG を押すと、HostPCProgram が `image_inspection_db` を更新し、画像検査Program が結果を読み取る。
+オペレーターが OK/NG を押すと、HostPCProgram が `host_pc_db` を更新し、画像検査Program が結果を読み取る。
 
 ```mermaid
 sequenceDiagram
     actor Op as オペレーター
     participant IMG as 画像検査Program（C0L-0162）
-    participant IDB as image_inspection_db（画像検査専用DB）
+    participant IDB as host_pc_db（画像検査専用DB）
     participant App as HostPCProgram（作業指示Program）
     participant T as タブレット
 
@@ -454,9 +459,9 @@ sequenceDiagram
 
 ---
 
-### 9-3. image_inspection_db の主要テーブル（概要）
+### 9-3. host_pc_db の主要テーブル（概要）
 
-`image_inspection_db` は画像検査Program が管理する専用DBです。  
+`host_pc_db` は画像検査Program が管理する専用DBです。  
 HostPCProgram はこのDBに対して **読み取り・更新のみ** 行い、スキーマ管理は画像検査Program 側が行います。  
 詳細は **[08_image_inspection_db.md](08_image_inspection_db.md)** を参照してください。
 

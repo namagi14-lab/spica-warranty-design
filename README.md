@@ -3,6 +3,13 @@
 > **Spica（プリンター）の保証工程を管理するシステムの設計書・仕様書リポジトリ**  
 > アプリ本体は [WorkInstructionApp](https://github.com/namagi14-lab/WorkInstructionApp) にあります。
 
+> ## ⚠️ 大きな仕様変更（HostPcアプリ中心アーキテクチャ）
+> MiniPC は HostPCProgram ではなく **HostPcアプリ（CarrotRape）の WebAPI** を中心に連携する構成へ移行しました。
+> 中心DBは `prod_process_execution_db`（MySQL）から **`host_pc_db`（SQL Server / 旧 `image_inspection_db` を改称）** に移り、
+> `prod_process_execution_db`（新DB）は**ダッシュボード表示用に残置**します（HostPcアプリがミラー書き込み）。
+> **MiniPC は DB へ直接 INSERT せず、HostPcアプリに API を発行**します。工程JSONの受け渡しも HostPcアプリが担当します。
+> 詳細・読み替えルールは **[12_host_pc_app_pivot.md](docs/12_host_pc_app_pivot.md)** を参照（旧ドキュメント 01〜11 と矛盾する場合は本書を優先）。
+
 ---
 
 ## システム構成
@@ -18,12 +25,12 @@ graph TB
     end
 
     subgraph HostPC
-        H["🖥️ HostPCProgram\nC0L-0160 / ASP.NET MVC 5"]
-        DB[("🗄️ MySQL\nprod_process_execution_db")]
-        IDB[("🗄️ MySQL\nimage_inspection_db\n画像検査専用")]
+        APP["🟢 HostPcアプリ（CarrotRape）\nASP.NET Core WebAPI\n★新・中心アプリ"]
+        IDB[("🗄️ SQL Server\nhost_pc_db\n★中心トランザクションDB\n旧 image_inspection_db")]
+        DB[("🗄️ MySQL\nprod_process_execution_db\n新DB・ダッシュボード表示用に残置")]
         Dash["🌐 DashboardProgram\nC0L-0164"]
-        H <-->|SQL 書込専用| DB
-        H <-->|SQL 読取・更新| IDB
+        APP <-->|SQL 読み書き| IDB
+        APP -.->|ミラー書き込み（改造）| DB
         Dash -->|SQL READ ONLY（直接参照）| DB
     end
 
@@ -35,28 +42,28 @@ graph TB
         DBE["DBEntryApp\n工程マスタ管理"]
     end
 
-    M -->|WebAPI HTTP| H
-    H -->|コールバック HTTP| M
-    T -->|HTTP| H
-    H -->|SignalR 作業指示| T
-    H -->|SignalR 更新通知| Dash
+    M -->|WebAPI HTTP| APP
+    APP -->|工程JSON・OK/NG| M
+    T -->|HTTP| APP
+    IMG -->|WebAPI / SQL| APP
     Dash -->|HTTP ブラウザ| DispDev
-    IMG -->|SQL 直接書込| IDB
-    DBE -->|工程定義同期| H
+    DBE -->|工程定義同期| APP
 ```
 
-> **画像検査工程の暫定構成について**:  
-> 画像検査Program（C0L-0162）は現行システムのAPI連携に対応していないため、暫定的に専用DB（`image_inspection_db`）を介した構成を採用している。  
-> HostPCProgram が `image_inspection_db` を読み取り・更新することで、タブレットへの作業指示表示・OK/NG返却を仲介する。  
-> **将来的には通常のMiniPC→API構成に統一する予定。**（→ 詳細は [08_image_inspection_db.md](docs/08_image_inspection_db.md) を参照）
+> **アーキテクチャ方針（更新後）**:  
+> - MiniPC は **HostPcアプリ（CarrotRape）の WebAPI** を中心に連携する。**DB へ直接 INSERT しない。**  
+> - 中心トランザクションDBは **`host_pc_db`（SQL Server / 旧 `image_inspection_db`）**。HostPcアプリが所有する。  
+> - 工程JSON（治具JSON）の受け渡しは **HostPcアプリが担当**する。  
+> - 画像検査は暫定構成ではなく、`host_pc_db` を中心とした**正式構成**となった。  
+> （→ 詳細・旧ドキュメントの読み替えは [12_host_pc_app_pivot.md](docs/12_host_pc_app_pivot.md) を参照）
 
 > **マシン特定の原則**: すべての処理でマシンを特定するキーは**シリアル番号**を使用する。
 
 > **DBアクセスポリシー**:
-> - **INSERT / UPDATE**: HostPCProgram のみが行う（書き込みの一元管理）
-> - **SELECT（READ ONLY）**: DashboardProgram（HostPC上）は MySQL へ直接 SQL を発行してデータを参照する
-> - SignalR はダッシュボードへの「更新トリガー通知」のみに使用し、データ本体はダッシュボードが DB から直接取得する
-> - MySQLユーザーはアプリケーション別に分離する（HostPCProgram 用: 全権限 / DashboardProgram 用: SELECT のみ）
+> - **INSERT / UPDATE**: HostPcアプリ（CarrotRape）のみが行う（書き込みの一元管理）
+> - **新DB（`prod_process_execution_db`）へのミラー**: HostPcアプリが `host_pc_db` への書き込みと同期して行う
+> - **SELECT（READ ONLY）**: DashboardProgram は `prod_process_execution_db`（新DB）へ直接 SQL を発行して参照する（従来どおり）
+> - DBユーザーはアプリケーション別に分離する（HostPcアプリ用: 全権限 / DashboardProgram 用: SELECT のみ）
 
 ---
 
@@ -99,23 +106,27 @@ graph TB
 
 | # | ファイル | 内容 |
 |---|---------|------|
+| **12** | **[host_pc_app_pivot.md](docs/12_host_pc_app_pivot.md)** | **★現行方針: HostPcアプリ中心アーキテクチャへの移行（最優先で読む）** |
 | 01 | [system_overview.md](docs/01_system_overview.md) | システム全体構成・概要 |
-| 02 | [db_schema.md](docs/02_db_schema.md) | DB テーブル定義・設計方針 |
+| 02 | [db_schema.md](docs/02_db_schema.md) | 新DB `prod_process_execution_db` テーブル定義（ダッシュボード用） |
 | 03 | [er_diagram.md](docs/03_er_diagram.md) | ER 図（Mermaid） |
-| 04 | [api_spec.md](docs/04_api_spec.md) | MachineApi / StepApi / InstructionApi 仕様 |
-| 05 | [sequence.md](docs/05_sequence.md) | 基本シーケンス図 |
-| 06 | [process_file_api.md](docs/06_process_file_api.md) | 工程 Jsonファイル API 仕様（/ProcessFileApi） |
-| **07** | **[system_design.md](docs/07_system_design.md)** | **システム設計書（Mermaid シーケンス 9本）← メイン** |
+| 04 | [api_spec.md](docs/04_api_spec.md) | MachineApi / StepApi / InstructionApi 仕様（旧 HostPCProgram） |
+| 05 | [sequence.md](docs/05_sequence.md) | 基本シーケンス図（旧構成・読み替え必要） |
+| 06 | [process_file_api.md](docs/06_process_file_api.md) | 工程 Jsonファイル API 仕様（旧 /ProcessFileApi・読み替え必要） |
+| 07 | [system_design.md](docs/07_system_design.md) | システム設計書（Mermaid シーケンス 9本・旧構成・読み替え必要） |
 | 08a | [image_inspection.md](docs/08_image_inspection.md) | 旧機種 RasPi 画像検査プログラム調査結果 |
-| 08b | [image_inspection_db.md](docs/08_image_inspection_db.md) | 画像検査専用 DB 仕様（暫定構成）|
-| 09 | [schedule.md](docs/09_schedule.md) | 作業指示Program 開発スケジュール |
-| 10 | [image_inspection_api.md](docs/10_image_inspection_api.md) | 画像検査連携フロー・API設計（HostPCProgram 実装仕様） |
-| — | [SQL/schema.sql](SQL/schema.sql) | 完全 DDL（CREATE TABLE） |
+| 08b | [host_pc_db.md](docs/08_image_inspection_db.md) | `host_pc_db`（旧 `image_inspection_db`）DB 仕様 |
+| 09 | [schedule.md](docs/09_schedule.md) | 開発スケジュール |
+| 10 | [host_pc_db_api.md](docs/10_image_inspection_api.md) | `host_pc_db` 連携フロー・API設計 |
+| — | [SQL/schema.sql](SQL/schema.sql) | 新DB 完全 DDL（CREATE TABLE） |
 | — | [docs/process_file_samples/](docs/process_file_samples/) | 工程 JSON サンプルファイル |
 
 ---
 
 ## API 早見表
+
+> **注**: 下表は旧 HostPCProgram のエンドポイント一覧です。新構成では MiniPC は **HostPcアプリ（CarrotRape）の WebAPI** を呼びます。
+> 旧 API → HostPcアプリ API の対応は **[12_host_pc_app_pivot.md §4](docs/12_host_pc_app_pivot.md#4-minipc--hostpcアプリ-api-対応表)** を参照。
 
 ### タブレット → HostPCProgram（オペレーター操作）
 
@@ -145,6 +156,9 @@ graph TB
 ---
 
 ## DB テーブル早見表
+
+> 下表は **新DB `prod_process_execution_db`（MySQL）** のテーブル（ダッシュボード表示用に残置）。
+> 中心トランザクションは **`host_pc_db`（SQL Server）** の `Session` / `Jig_Process` / `ImageAnalysisJob` 等で管理する（→ [08b](docs/08_image_inspection_db.md) / [12](docs/12_host_pc_app_pivot.md)）。
 
 ### マスタ系
 

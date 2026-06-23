@@ -1,5 +1,8 @@
 # 06 工程Jsonファイル API 仕様
 
+> ⚠️ 本書は旧 HostPCProgram の `/ProcessFileApi` 仕様です。現行方針では工程JSON（治具JSON）の受け渡しは
+> **HostPcアプリ（CarrotRape）** が担当します（`GET /api/Session/{id}/Next` 等）。最新方針: **[12_host_pc_app_pivot.md](12_host_pc_app_pivot.md)**。
+
 MiniPC（治具）が HostPC に問い合わせて、次に実行すべき工程JSONファイルを取得するAPIです。
 
 - **DB**: `prod_process_execution_db`
@@ -171,7 +174,7 @@ Content-Type: `application/json`
 
 ## 画像検査ハンドオフフロー
 
-`isImageInspection: true` を受け取った MiniPC は、HostPCProgram への工程ファイル問い合わせを一時停止し、画像検査PC（C0L-0162）と `image_inspection_db` を中心とした画像検査フローに移行する。
+`isImageInspection: true` を受け取った MiniPC は、HostPCProgram への工程ファイル問い合わせを一時停止し、画像検査PC（C0L-0162）と `host_pc_db` を中心とした画像検査フローに移行する。
 
 ### MiniPC の挙動
 
@@ -181,10 +184,10 @@ GET /ProcessFileApi/Next → isImageInspection: true を受信
   ▼
 【画像検査モード突入】
   │  HostPCProgram への /Next 問い合わせを停止
-  │  画像検査PC（C0L-0162）が image_inspection_db を更新するのを待つ
+  │  画像検査PC（C0L-0162）が host_pc_db を更新するのを待つ
   │
   ▼
-image_inspection_db.Session の ALLResult をポーリング（~1秒間隔）
+host_pc_db.Session の ALLResult をポーリング（~1秒間隔）
   │  HostPCProgram も同時に Session をポーリングし、
   │  Tablet_Interruptible を検知したら作業指示Program へ SignalR 通知する
   │  （オペレーター確認が必要な場合のみ）
@@ -204,7 +207,7 @@ image_inspection_db.Session の ALLResult をポーリング（~1秒間隔）
 sequenceDiagram
     participant M  as MiniPC<br>(C0L-0161)
     participant H  as HostPCProgram<br>(C0L-0160)
-    participant DB as image_inspection_db<br>(SQL Server)
+    participant DB as host_pc_db<br>(SQL Server)
     participant I  as 画像検査PC<br>(C0L-0162)
     participant T  as 作業指示Program<br>(C0L-0163)
 
@@ -264,4 +267,4 @@ sequenceDiagram
 | `process_file_execution` | MiniPC の実行進捗（execution ごと）|
 | `process_execution` | MiniPC の工程実行トランザクション |
 | `process_master` | 工程マスタ |
-| `image_inspection_db.Session` | 画像検査フロー中の状態管理（画像検査モード時） |
+| `host_pc_db.Session` | 画像検査フロー中の状態管理（画像検査モード時） |
