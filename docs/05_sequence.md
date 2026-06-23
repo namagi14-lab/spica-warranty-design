@@ -74,24 +74,32 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-  participant Pre as 前工程
-  participant T   as タブレット/作業者
+  actor Op as 作業者
+  participant T   as タブレット（作業指示Program）
   participant H   as HostPC
   participant DB  as MySQL
   participant M   as MiniPC
   participant P   as プリンター
 
-  Pre->>T: シリアル番号スキャン
+  Note over Op,P: ソフトインストール工程（IP採番）
+
+  Op->>T: マシンのシリアル番号をスキャン
   T->>H: シリアル番号通知
   H->>DB: ip_numbering から未使用IPを取得
   H->>DB: INSERT ip_numbering {serial, ip, isFinished=0}
   H-->>T: IP採番完了通知
-  H->>M: IP設定指示 {serial, ip}
+  H->>M: IP設定指示（プッシュ）{serial, ip}
   M->>P: IP設定コマンド送信
   P-->>M: 設定完了
   M-->>H: 完了通知
 
-  Note over H,DB: 工程完了後
+  Note over Op,DB: 以降の工程ではシリアルから IP を照会
+  Op->>T: シリアル番号をスキャン
+  T->>H: シリアルから IP を照会
+  H->>DB: ip_numbering から対応IPを取得
+  H-->>T: { ip }
+
+  Note over H,DB: 保証工程をすべて終えてライン退場時
   H->>DB: UPDATE ip_numbering SET IsFinished=1
 ```
 

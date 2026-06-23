@@ -46,10 +46,12 @@ sequenceDiagram
     Note over App,Machine: 【事前準備】管理者が工程・Jsonファイル・作業指示を登録済み
 
     rect rgb(200,230,255)
-        Note over MiniPC,Machine: ① IP採番（初工程のみ）
-        MiniPC->>App: GET /IpApi/Assign?serialNo=SN123
-        App-->>MiniPC: { ipAddress: "192.168.1.10" }
-        MiniPC->>Machine: IPアドレスを付与
+        Note over Op,Machine: ① IP採番（ソフトインストール工程）
+        Op->>Tablet: マシンのシリアル番号をスキャン
+        Tablet->>App: POST /IpApi/Assign { serialNo: SN123 }
+        App->>App: ip_numbering から空きIPを採番・登録（シリアルと紐付け）
+        App->>MiniPC: POST /api/ipAssign { serialNo, ipAddress }（プッシュ）
+        MiniPC->>Machine: IPアドレスを設定
     end
 
     loop 各工程（STA1 → STA2 → ... → COA1 → ... → Final）
@@ -114,26 +116,35 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    participant MiniPC as MiniPC（治具）
+    actor Op as オペレーター
+    participant Tablet as タブレット（作業指示Program）
     participant App as HostPCProgram
     participant DB as MySQL
+    participant MiniPC as MiniPC（治具）
     participant Machine as 製品マシン
 
-    Note over MiniPC,Machine: SetSerial 工程（最初の工程）
+    Note over Op,Machine: ソフトインストール工程（IP採番）
 
-    MiniPC->>App: GET /IpApi/Assign?serialNo=SN123
+    Op->>Tablet: マシンのシリアル番号をスキャン
+    Tablet->>App: POST /IpApi/Assign { serialNo: SN123 }
     App->>DB: ip_numbering から IsFinished=0 の空き IP を 1 件取得
     App->>DB: ip_numbering UPDATE（MachineSerial=SN123 を紐付け、使用中フラグ）
-    App-->>MiniPC: { ipAddress: "192.168.1.10" }
-
-    MiniPC->>Machine: IP アドレス設定コマンド送信（SetSerial.json の内容）
+    App->>MiniPC: POST /api/ipAssign { serialNo, ipAddress }（プッシュ）
+    MiniPC->>Machine: IP アドレス設定コマンド送信
     Machine-->>MiniPC: 設定完了
+    MiniPC-->>App: 受信確認（200 OK）
+    App-->>Tablet: 採番結果（{ ipAddress: "192.168.1.10" }）
+    Tablet-->>Op: 採番完了を表示
 
-    Note over MiniPC,DB: 工程完了後
-    MiniPC->>App: POST /MachineApi/Complete { serialNo, result: OK }
-    App->>DB: ip_numbering.IsFinished = 1（使用終了）
-    App->>DB: process_execution.Status = OK
+    Note over Op,DB: 以降の工程ではシリアルから IP を照会
+    Op->>Tablet: シリアル番号をスキャン
+    Tablet->>App: シリアルから IP を照会
+    App->>DB: ip_numbering から SN123 の IP を取得
+    App-->>Tablet: { ipAddress: "192.168.1.10" }
 ```
+
+> `ip_numbering.IsFinished` は、マシンが保証工程をすべて終えてラインを離れる際に `1`（返却可）へ更新する。
+> 工程の途中ではシリアルと IP の紐付けを保持し、各工程でシリアルから IP を参照できるようにする。
 
 ---
 
@@ -512,6 +523,7 @@ HostPCProgram が使用する主なカラム:
 
 | エンドポイント | 用途 |
 |--------------|------|
+| `POST /IpApi/Assign` | **IP 採番**（タブレットでシリアルをスキャン → 空き IP を採番・登録） |
 | `POST /MachineApi/Enter` | **入室**（オペレーターがシリアル番号を入力） |
 | `POST /InstructionApi/Complete` | 作業指示を OK/NG で完了 |
 
@@ -519,7 +531,6 @@ HostPCProgram が使用する主なカラム:
 
 | エンドポイント | 用途 |
 |--------------|------|
-| `GET /IpApi/Assign?serialNo=` | **IP 採番**（空き IP を割り当て） |
 | `GET /ProcessFileApi/Next?serialNo=` | 次に実行する JSON ファイルを問い合わせ |
 | `GET /ProcessFileApi/FileContent/{seqId}` | ファイル内容を取得（ハッシュ不一致時） |
 | `POST /StepApi/UpdateStep` | Step 開始通知（MANUAL Step の確認トリガー） |
@@ -531,6 +542,7 @@ HostPCProgram が使用する主なカラム:
 
 | エンドポイント | 用途 |
 |--------------|------|
+| `POST /api/ipAssign` | 採番した IP をプッシュ通知（MiniPC がマシンに設定） |
 | `POST /api/instructionResult` | 作業指示の OK/NG をプッシュ通知 |
 
 > MiniPC の IP は ゾーン設定またはMiniPC 起動時の登録情報から解決する。
