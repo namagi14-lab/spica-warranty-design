@@ -61,7 +61,7 @@ namespace MiniPcApiSample.Workflow
 
                 if (next.IsImageInspection)
                 {
-                    // TODO(別担当): 画像検査モード。image_inspection_db の ALLResult をポーリングし、
+                    // TODO(別担当): 画像検査モード。host_pc_db の ALLResult をポーリングし、
                     //               OK/NG になったら次へ進む（docs/06_process_file_api.md 参照）。
                     Console.WriteLine("[Runner] 画像検査モード（スタブ）。");
                     continue;

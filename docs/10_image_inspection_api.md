@@ -1,8 +1,9 @@
-# 10 画像検査連携フロー・API設計
+# 10 `host_pc_db` 連携フロー・API設計
 
-> **対象タスク**: 画像検査工程専用API（`ImageAnalysisJobsApi`）— `09_schedule.md` 参照  
-> **DB**: `image_inspection_db`（SQL Server / km.local 10.183.29.246,1433）  
-> **方針**: 画像検査Program（C0L-0162）は**一切変更しない**。HostPCProgram（C0L-0160）が DB をポーリングして変化を検知し、タブレットへ SignalR でプッシュする。
+> **DB**: `host_pc_db`（旧 `image_inspection_db` / SQL Server / km.local 10.183.29.246,1433）— 保証工程の中心トランザクションDB  
+> **所有アプリ**: HostPcアプリ（CarrotRape）。MiniPC・タブレット・画像検査PC はこのアプリの WebAPI を介して連携する。  
+> **現行方針**: 旧版の「HostPCProgram が DB をポーリングして仲介する暫定構成」は、HostPcアプリ中心構成に置き換わりました（→ [12_host_pc_app_pivot.md](12_host_pc_app_pivot.md)）。
+> 以下の本文は旧構成の連携フロー（参考）です。`Session` テーブルの実仕様はリポジトリ `CarrotRape` が正となります。
 
 ---
 
@@ -20,7 +21,7 @@ sequenceDiagram
     participant FTP as FTPフォルダ<br>C:\inetpub\ftproot
     participant MiniPC as MiniPC<br>（サーバー）
     participant HostPC as HostPC<br>(HostPCProgram)
-    participant DB as 画像処理DB<br>(image_inspection_db)
+    participant DB as 画像処理DB<br>(host_pc_db)
     participant ImgPC as 画像検査PC<br>(C0L-0162)
     participant Tablet as Tablet<br>（作業指示Program）
 
@@ -64,7 +65,7 @@ sequenceDiagram
 画像検査中にオペレーター確認が必要な場合（`OperatorMsg` に `"Tablet_Interruptible"` が含まれるとき）の連携。
 
 ```
-画像検査Program     image_inspection_db     HostPCProgram     作業指示Program
+画像検査Program     host_pc_db     HostPCProgram     作業指示Program
   (C0L-0162)        (SQL Server)              (C0L-0160)            (C0L-0163)
       │                   │                       │                      │
       │  INSERT/UPDATE     │                       │                      │
@@ -94,7 +95,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant I  as 画像検査Program<br>(C0L-0162)
-    participant DB as image_inspection_db<br>(SQL Server)
+    participant DB as host_pc_db<br>(SQL Server)
     participant H  as HostPCProgram<br>(C0L-0160)
     participant T  as 作業指示Program<br>(C0L-0163)
     actor Op as オペレーター
@@ -135,7 +136,7 @@ sequenceDiagram
 
 ---
 
-## 3. image_inspection_db テーブル詳細
+## 3. host_pc_db テーブル詳細
 
 ### 3.1 `Session`（メインセッション管理テーブル）
 

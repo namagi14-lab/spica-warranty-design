@@ -94,7 +94,9 @@
 
 ---
 
-## 画像検査DB連携（image_inspection_db）
+## host_pc_db 連携（旧 image_inspection_db）
+
+> 現行方針では `host_pc_db` は中心トランザクションDBとなり、HostPcアプリ（CarrotRape）が所有する（→ [12_host_pc_app_pivot.md](12_host_pc_app_pivot.md)）。
 
 | タスク | 担当 | 進捗 | 開始 | 終了 | 備考 |
 |-------|------|:----:|------|------|------|
@@ -138,4 +140,5 @@
 
 | 日付 | 変更内容 |
 |------|---------|
+| 2026/6/23 | 大きな仕様変更を反映。MiniPC連携先を HostPcアプリ（CarrotRape）へ移行、中心DBを `host_pc_db`（旧 `image_inspection_db`）へ変更、新DB `prod_process_execution_db` はダッシュボード用に残置（ミラー書き込み）。詳細は [12_host_pc_app_pivot.md](12_host_pc_app_pivot.md) |
 | 2026/6/10 | 初版作成。旧スケジュールからタスクを再整理。`アプリケーション開発（60%）`を各コンポーネント別タスクに分解。SignalR・MiniPCコールバック・管理画面タスクを新規追加 |
