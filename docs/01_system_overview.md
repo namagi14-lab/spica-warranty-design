@@ -106,14 +106,22 @@ CELL (cells テーブル)
 ## 7. IPアドレス管理
 
 保証工程に入ってくるプリンターはすべて同一のデフォルトIPアドレスを持つため、
-入庫時に固有IPを採番してマシンシリアルと紐づける。
+ソフトインストール工程で固有IPを採番してマシンシリアルと紐づける。
 
 ```
-前工程 → シリアル通知 → HostPC → 未使用IPを採番
-                                  → ip_numbering に登録
-                                  → MiniPCへIP設定指示
-                                  → MiniPC → プリンターのIPを変更
+【ソフトインストール工程：IP採番】
+作業者がタブレットでマシンのシリアル番号をスキャン
+  → 作業指示Program（タブレット）→ HostPCProgram へシリアルを通知
+  → HostPCProgram が未使用IPを採番し ip_numbering に登録（シリアルと紐付け）
+  → HostPCProgram → MiniPC へ採番したIPを通知（プッシュ）
+  → MiniPC → プリンターのIPを設定
+
+【以降の工程】
+タブレットでシリアルをスキャンするだけで ip_numbering から対応IPを参照できる
 ```
+
+> **採番主体**: IP採番・登録は HostPCProgram（C0L-0160）が `ip_numbering`（`prod_process_execution_db`）に対して行う。
+> HostPcアプリ（CarrotRape）への移行対象ではなく、従来どおり HostPCProgram が担当する。
 
 ---
 

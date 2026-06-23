@@ -70,10 +70,13 @@ graph TB
 ## 保証工程の流れ
 
 ```
-① IP採番（初工程のみ）
-   MiniPC がサーバーに「SN123 の IP をください」と問い合わせ
-   → サーバーが ip_numbering プールから空き IP を割り当て
-   → MiniPC が製品マシンに IP を付与
+① IP採番（ソフトインストール工程）
+   作業者がタブレットでマシンのシリアル番号をスキャン
+   → 作業指示Program（タブレット）が HostPCProgram にシリアルを通知
+   → HostPCProgram が ip_numbering プールから空き IP を採番し、シリアルと紐づけて登録
+   → HostPCProgram が MiniPC へ採番した IP を通知（プッシュ）
+   → MiniPC が製品マシンに IP を設定
+   ※ 以降の工程では、タブレットでシリアルをスキャンするだけで登録済みの IP が分かる
 
 ② 入室（オペレーターがタブレットから）
    オペレーターがタブレットでシリアル番号を入力・入室操作
@@ -132,6 +135,7 @@ graph TB
 
 | エンドポイント | 用途 |
 |--------------|------|
+| `POST /IpApi/Assign` | **IP 採番**（タブレットでシリアルをスキャン → 空き IP を採番・登録） |
 | `POST /MachineApi/Enter` | **入室**（オペレーターがシリアル番号を入力） |
 | `POST /InstructionApi/Complete` | 作業指示を OK/NG で完了 |
 
@@ -139,7 +143,6 @@ graph TB
 
 | エンドポイント | 用途 |
 |--------------|------|
-| `GET /IpApi/Assign?serialNo=` | **IP 採番**（空き IP をサーバーから取得） |
 | `GET /ProcessFileApi/Next?serialNo=` | 次の JSON ファイルを問い合わせ |
 | `GET /ProcessFileApi/FileContent/{seqId}` | ファイル内容を取得（ハッシュ不一致時） |
 | `POST /StepApi/UpdateStep` | Step 開始通知（MANUAL Step の確認トリガー） |
@@ -151,6 +154,7 @@ graph TB
 
 | エンドポイント | 用途 |
 |--------------|------|
+| `POST /api/ipAssign` | 採番した IP をプッシュ通知（MiniPC がマシンに設定） |
 | `POST /api/instructionResult` | 作業指示の OK/NG 結果をプッシュ通知 |
 
 ---
