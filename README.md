@@ -63,6 +63,7 @@ graph TB
 > - **INSERT / UPDATE**: HostPcアプリ（CarrotRape）のみが行う（書き込みの一元管理）
 > - **新DB（`prod_process_execution_db`）へのミラー**: HostPcアプリが `host_pc_db` への書き込みと同期して行う
 > - **SELECT（READ ONLY）**: DashboardProgram は `prod_process_execution_db`（新DB）へ直接 SQL を発行して参照する（従来どおり）
+> - **作業指示Program（C0L-0163）は MySQL に接続しない**。作業指示の取得・OK/NG 通知は **HostPcアプリの `GetTablet` / `PutTabletExeStatus` API** 経由で行う（`Session.OperatorMsg` は SQL Server のみ存在）
 > - DBユーザーはアプリケーション別に分離する（HostPcアプリ用: 全権限 / DashboardProgram 用: SELECT のみ）
 
 ---
@@ -109,8 +110,8 @@ graph TB
 
 | # | ファイル | 内容 |
 |---|---------|------|
-| **13** | **[carrotrape_spec.md](docs/13_carrotrape_spec.md)** | **★CarrotRape（HostPcアプリ）ソースコード調査に基づく仕様書（DB構造・API全量）** |
 | **12** | **[host_pc_app_pivot.md](docs/12_host_pc_app_pivot.md)** | **★現行方針: HostPcアプリ中心アーキテクチャへの移行（最優先で読む）** |
+| **13** | **[carrotrape_spec.md](docs/13_carrotrape_spec.md)** | **CarrotRape（HostPcアプリ）DB・API 仕様（ソースコード調査に基づく）** |
 | 01 | [system_overview.md](docs/01_system_overview.md) | システム全体構成・概要 |
 | 02 | [db_schema.md](docs/02_db_schema.md) | 新DB `prod_process_execution_db` テーブル定義（ダッシュボード用） |
 | 03 | [er_diagram.md](docs/03_er_diagram.md) | ER 図（Mermaid） |
