@@ -112,6 +112,7 @@ graph TB
 |---|---------|------|
 | **12** | **[host_pc_app_pivot.md](docs/12_host_pc_app_pivot.md)** | **★現行方針: HostPcアプリ中心アーキテクチャへの移行（最優先で読む）** |
 | **13** | **[carrotrape_spec.md](docs/13_carrotrape_spec.md)** | **CarrotRape（HostPcアプリ）DB・API 仕様（ソースコード調査に基づく）** |
+| **14** | **[work_instruction_app_migration.md](docs/14_work_instruction_app_migration.md)** | **WorkInstructionApp の CarrotRape API 移行設計案（Cell/Zone SQL Server 追加含む）** |
 | 01 | [system_overview.md](docs/01_system_overview.md) | システム全体構成・概要 |
 | 02 | [db_schema.md](docs/02_db_schema.md) | 新DB `prod_process_execution_db` テーブル定義（ダッシュボード用） |
 | 03 | [er_diagram.md](docs/03_er_diagram.md) | ER 図（Mermaid） |
